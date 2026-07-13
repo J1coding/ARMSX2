@@ -44,6 +44,7 @@ concurrency:
 jobs:
   # ---- PC arm64 Qt GUI (mac / linux) -------------------------------------
   pc-macos-arm64:
+    if: false  # tester branch: iOS-only
     name: PC · macOS arm64 (Qt)
     uses: ./.github/workflows/macos_build.yml
     with:
@@ -51,6 +52,7 @@ jobs:
       artifactPrefixName: "armsx2-macos-arm64"
 
   pc-linux-arm64:
+    if: false  # tester branch: iOS-only
     name: PC · Linux arm64 (Qt)
     strategy:
       fail-fast: false
@@ -76,6 +78,7 @@ jobs:
 
   # ---- PC arm64 Qt GUI (windows) -----------------------------------------
   pc-windows-arm64:
+    if: false  # tester branch: iOS-only
     name: PC · Windows arm64 (Qt)
     uses: ./.github/workflows/windows_build_qt.yml
     with:
@@ -84,6 +87,7 @@ jobs:
 
   # ---- Android APK -------------------------------------------------------
   android:
+    if: false  # tester branch: iOS-only
     name: Android APK
     runs-on: ubuntu-24.04
     # Non-blocking until the collapsed-core Android build first goes green.
@@ -148,12 +152,25 @@ jobs:
           -DCMAKE_SYSTEM_NAME=iOS
           -DCMAKE_OSX_ARCHITECTURES=arm64
           -DARMSX2_REAL_DEVICE=ON
+          -DARMSX2_IOS_DSYM=ON
 
       - name: Build (iphoneos SDK, unsigned)
         working-directory: platforms/ios/app/src/main/cpp
         run: >
           cmake --build build --config Release
           -- -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+
+      - name: Generate dSYM (for crash symbolication)
+        working-directory: platforms/ios/app/src/main/cpp
+        run: |
+          APP_PATH=$(find build -name "ARMSX2iOS.app" -type d | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: ARMSX2iOS.app not found; cannot generate dSYM"
+            exit 1
+          fi
+          echo "Generating dSYM for: $APP_PATH/ARMSX2iOS"
+          dsymutil "$APP_PATH/ARMSX2iOS"
+          ls -lh "$APP_PATH.dSYM"
 
       - name: Package unsigned .ipa
         working-directory: platforms/ios/app/src/main/cpp
@@ -188,6 +205,13 @@ jobs:
           path: ${{ github.workspace }}/${{ env.IPA_NAME }}
           if-no-files-found: error
 
+      - name: Upload dSYM (for crash symbolication)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ARMSX2-iOS-${{ github.sha }}-dSYM
+          path: platforms/ios/app/src/main/cpp/build/Release-iphoneos/ARMSX2iOS.app.dSYM
+          if-no-files-found: error
+
   # ---- Alert on a broken master build ------------------------------------
   # Fires only when a BLOCKING guardrail job (the PC arm64 builds) fails on a
   # push to master -- never on PRs, and never on the non-blocking mobile jobs
@@ -196,7 +220,7 @@ jobs:
   notify-failure:
     name: Notify on master build failure
     needs: [pc-macos-arm64, pc-linux-arm64, pc-windows-arm64]
-    if: ${{ failure() && github.event_name == 'push' }}
+    if: ${{ false && failure() && github.event_name == 'push' }}  # tester branch: iOS-only
     runs-on: ubuntu-latest
     # Job-level so the step's `if: env.HOOK != ''` guard can see it.
     env:
