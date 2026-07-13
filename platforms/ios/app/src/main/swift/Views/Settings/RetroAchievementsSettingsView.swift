@@ -300,6 +300,10 @@ struct RetroAchievementsSettingsView: View {
     }
 
     private func refresh() {
+        // Skip while the login sheet is up: refresh() mutates @State, which
+        // re-evaluates this view's body and re-runs the .sheet content closure,
+        // rebuilding the sheet and dismissing the keyboard on each keystroke.
+        guard !showingLogin else { return }
         state = ARMSX2Bridge.retroAchievementsState()
         achievementsEnabled = bool("enabled")
         // The in-memory EmuConfig.Achievements.HardcoreMode (exposed via
