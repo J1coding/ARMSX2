@@ -272,6 +272,18 @@
             Console.WriteLn("[UI] SwiftUI menu attached (screen: %.0fx%.0f)",
                 rootVC.view.bounds.size.width, rootVC.view.bounds.size.height);
 
+            // Belt-and-suspenders: by the next runloop UIKit has usually resolved
+            // the held orientation, so sync the frame now to avoid a visible flash.
+            // sceneDidBecomeActive: (above) catches the case where the scene hasn't
+            // settled yet by the next runloop.
+            dispatch_async(dispatch_get_main_queue(), ^{
+                UIWindowScene *ws = self.window.windowScene;
+                if (ws && !CGRectEqualToRect(self.window.frame, ws.coordinateSpace.bounds)) {
+                    self.window.frame = ws.coordinateSpace.bounds;
+                    [self.window.rootViewController.view setNeedsLayout];
+                    [self.window.rootViewController.view layoutIfNeeded];
+                }
+            });
 }
     }
 
@@ -1134,6 +1146,22 @@ static void ARMSX2StartJITKeepalive()
 }
 
 - (void)sceneDidBecomeActive:(UIScene *)scene {
+    // Cold-launch fix: willConnectTo: runs while the scene is still in its
+    // default portrait orientation (portrait is first in
+    // UISupportedInterfaceOrientations), so SDL's window and the SwiftUI child
+    // VC inherit portrait bounds. By didBecomeActive the scene has autorotated
+    // to the held orientation -- sync the window frame and force a relayout so
+    // the child re-measures against the correct bounds. First-activation only;
+    // later rotations are handled by viewWillTransition in SwiftUIHost.swift.
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        UIWindowScene *ws = (UIWindowScene *)scene;
+        if (self.window && ws) {
+            self.window.frame = ws.coordinateSpace.bounds;
+            [self.window.rootViewController.view setNeedsLayout];
+            [self.window.rootViewController.view layoutIfNeeded];
+        }
+    });
 }
 
 - (void)sceneWillResignActive:(UIScene *)scene {
