@@ -229,10 +229,14 @@ struct RetroAchievementsSettingsView: View {
         }
         .sheet(isPresented: $showingLogin) {
             RetroAchievementsLoginSheet(
-                username: $username,
-                password: $password,
+                username: username,
+                password: password,
                 loggingIn: loggingIn,
-                onLogin: beginLogin,
+                onLogin: { enteredUsername, enteredPassword in
+                    username = enteredUsername
+                    password = enteredPassword
+                    beginLogin()
+                },
                 onCancel: {
                     guard !loggingIn else { return }
                     password = ""
@@ -370,10 +374,12 @@ struct RetroAchievementsSettingsView: View {
 
 private struct RetroAchievementsLoginSheet: View {
     @State private var settings = SettingsStore.shared
-    @Binding var username: String
-    @Binding var password: String
+    // Sheet-local state: keystrokes must not invalidate the presenting parent's body
+    // (which would rebuild the sheet, re-snap the detent, and dismiss the keyboard).
+    @State var username: String
+    @State var password: String
     let loggingIn: Bool
-    let onLogin: () -> Void
+    let onLogin: (String, String) -> Void
     let onCancel: () -> Void
 
     private var canSubmit: Bool {
@@ -397,7 +403,7 @@ private struct RetroAchievementsLoginSheet: View {
                         .submitLabel(.go)
                         .onSubmit {
                             if canSubmit {
-                                onLogin()
+                                onLogin(username, password)
                             }
                         }
                 } footer: {
@@ -421,12 +427,12 @@ private struct RetroAchievementsLoginSheet: View {
                         .disabled(loggingIn)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(settings.localized("Log In"), action: onLogin)
+                    Button(settings.localized("Log In")) { onLogin(username, password) }
                         .disabled(!canSubmit)
                 }
             }
         }
         .interactiveDismissDisabled(loggingIn)
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.medium])
     }
 }
