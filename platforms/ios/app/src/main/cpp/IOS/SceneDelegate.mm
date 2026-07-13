@@ -271,19 +271,6 @@
             }
             Console.WriteLn("[UI] SwiftUI menu attached (screen: %.0fx%.0f)",
                 rootVC.view.bounds.size.width, rootVC.view.bounds.size.height);
-
-            // Belt-and-suspenders: by the next runloop UIKit has usually resolved
-            // the held orientation, so sync the frame now to avoid a visible flash.
-            // sceneDidBecomeActive: (above) catches the case where the scene hasn't
-            // settled yet by the next runloop.
-            dispatch_async(dispatch_get_main_queue(), ^{
-                UIWindowScene *ws = self.window.windowScene;
-                if (ws && !CGRectEqualToRect(self.window.frame, ws.coordinateSpace.bounds)) {
-                    self.window.frame = ws.coordinateSpace.bounds;
-                    [self.window.rootViewController.view setNeedsLayout];
-                    [self.window.rootViewController.view layoutIfNeeded];
-                }
-            });
 }
     }
 
@@ -1146,21 +1133,31 @@ static void ARMSX2StartJITKeepalive()
 }
 
 - (void)sceneDidBecomeActive:(UIScene *)scene {
-    // Cold-launch fix: willConnectTo: runs while the scene is still in its
-    // default portrait orientation (portrait is first in
-    // UISupportedInterfaceOrientations), so SDL's window and the SwiftUI child
-    // VC inherit portrait bounds. By didBecomeActive the scene has autorotated
-    // to the held orientation -- sync the window frame and force a relayout so
-    // the child re-measures against the correct bounds. First-activation only;
-    // later rotations are handled by viewWillTransition in SwiftUIHost.swift.
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         UIWindowScene *ws = (UIWindowScene *)scene;
-        if (self.window && ws) {
-            self.window.frame = ws.coordinateSpace.bounds;
+        if (!self.window || !ws) return;
+        CGRect sb = ws.coordinateSpace.bounds;
+        CGRect wb = self.window.bounds;
+        Console.WriteLn("[Layout] sceneDidBecomeActive scene=%.0fx%.0f window=%.0fx%.0f",
+            sb.size.width, sb.size.height, wb.size.width, wb.size.height);
+        // If the window captured portrait bounds at launch (portrait is first
+        // in UISupportedInterfaceOrientations), SDL_SetWindowSize triggers SDL's
+        // full UIKit resize path (view frame + drawable size + WINDOWEVENT_RESIZED),
+        // which propagates through the pinned SwiftUI child VC. A short delay
+        // ensures the scene's autorotation has settled before we read bounds.
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)),
+            dispatch_get_main_queue(), ^{
+            if (!Host::g_sdl_window) return;
+            CGRect fs = ws.coordinateSpace.bounds;
+            int w = (int)fs.size.width;
+            int h = (int)fs.size.height;
+            Console.WriteLn("[Layout] SDL_SetWindowSize %dx%d (was %.0fx%.0f)", w, h,
+                self.window.bounds.size.width, self.window.bounds.size.height);
+            SDL_SetWindowSize(Host::g_sdl_window, w, h);
             [self.window.rootViewController.view setNeedsLayout];
             [self.window.rootViewController.view layoutIfNeeded];
-        }
+        });
     });
 }
 
