@@ -1133,31 +1133,41 @@ static void ARMSX2StartJITKeepalive()
 }
 
 - (void)sceneDidBecomeActive:(UIScene *)scene {
+    // Cold-launch fix: a scene-based app with UIRequiresFullScreen=true launches
+    // in the first plist orientation (Portrait) and never auto-rotates to match
+    // the device. SDL_SetWindowSize can't help here -- SDL3's UIKit_SetWindowSize
+    // is a no-op on iOS (its body is #ifdef SDL_PLATFORM_VISIONOS). The window is
+    // correctly sized for portrait; the orientation is wrong. requestGeometryUpdate
+    // rotates the scene, which fires viewWillTransition (SwiftUIHost.swift) and
+    // viewDidLayoutSubviews (sends SDL_EVENT_WINDOW_RESIZED), propagating correct
+    // landscape bounds through both the SDL window and the SwiftUI hosting layer.
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         UIWindowScene *ws = (UIWindowScene *)scene;
         if (!self.window || !ws) return;
-        CGRect sb = ws.coordinateSpace.bounds;
-        CGRect wb = self.window.bounds;
-        Console.WriteLn("[Layout] sceneDidBecomeActive scene=%.0fx%.0f window=%.0fx%.0f",
-            sb.size.width, sb.size.height, wb.size.width, wb.size.height);
-        // If the window captured portrait bounds at launch (portrait is first
-        // in UISupportedInterfaceOrientations), SDL_SetWindowSize triggers SDL's
-        // full UIKit resize path (view frame + drawable size + WINDOWEVENT_RESIZED),
-        // which propagates through the pinned SwiftUI child VC. A short delay
-        // ensures the scene's autorotation has settled before we read bounds.
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)),
-            dispatch_get_main_queue(), ^{
-            if (!Host::g_sdl_window) return;
-            CGRect fs = ws.coordinateSpace.bounds;
-            int w = (int)fs.size.width;
-            int h = (int)fs.size.height;
-            Console.WriteLn("[Layout] SDL_SetWindowSize %dx%d (was %.0fx%.0f)", w, h,
-                self.window.bounds.size.width, self.window.bounds.size.height);
-            SDL_SetWindowSize(Host::g_sdl_window, w, h);
-            [self.window.rootViewController.view setNeedsLayout];
-            [self.window.rootViewController.view layoutIfNeeded];
-        });
+
+        UIDeviceOrientation dev = [UIDevice currentDevice].orientation;
+        UIInterfaceOrientation iface = ws.interfaceOrientation;
+        Console.WriteLn("[Layout] sceneDidBecomeActive interface=%d device=%d bounds=%.0fx%.0f",
+            (int)iface, (int)dev,
+            ws.coordinateSpace.bounds.size.width, ws.coordinateSpace.bounds.size.height);
+
+        if (@available(iOS 16.0, *)) {
+            BOOL deviceLandscape = (dev == UIDeviceOrientationLandscapeLeft ||
+                                    dev == UIDeviceOrientationLandscapeRight);
+            BOOL sceneLandscape = UIInterfaceOrientationIsLandscape(iface);
+            if (deviceLandscape && !sceneLandscape) {
+                UIWindowSceneGeometryPreferencesIOS *prefs =
+                    [[UIWindowSceneGeometryPreferencesIOS alloc] init];
+                prefs.interfaceOrientations = UIInterfaceOrientationMaskLandscape;
+                [ws requestGeometryUpdateWithPreferences:prefs
+                    errorHandler:^(NSError *error) {
+                        Console.Error("[Layout] requestGeometryUpdate failed: %s",
+                            [[error localizedDescription] UTF8String]);
+                    }];
+                Console.WriteLn("[Layout] requested landscape geometry update");
+            }
+        }
     });
 }
 
