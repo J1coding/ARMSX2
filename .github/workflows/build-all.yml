@@ -152,25 +152,12 @@ jobs:
           -DCMAKE_SYSTEM_NAME=iOS
           -DCMAKE_OSX_ARCHITECTURES=arm64
           -DARMSX2_REAL_DEVICE=ON
-          -DARMSX2_IOS_DSYM=ON
 
       - name: Build (iphoneos SDK, unsigned)
         working-directory: platforms/ios/app/src/main/cpp
         run: >
           cmake --build build --config Release
           -- -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
-
-      - name: Generate dSYM (for crash symbolication)
-        working-directory: platforms/ios/app/src/main/cpp
-        run: |
-          APP_PATH=$(find build -name "ARMSX2iOS.app" -type d | head -1)
-          if [ -z "$APP_PATH" ]; then
-            echo "ERROR: ARMSX2iOS.app not found; cannot generate dSYM"
-            exit 1
-          fi
-          echo "Generating dSYM for: $APP_PATH/ARMSX2iOS"
-          dsymutil "$APP_PATH/ARMSX2iOS"
-          ls -lh "$APP_PATH.dSYM"
 
       - name: Package unsigned .ipa
         working-directory: platforms/ios/app/src/main/cpp
@@ -203,13 +190,6 @@ jobs:
         with:
           name: ${{ env.IPA_NAME }}
           path: ${{ github.workspace }}/${{ env.IPA_NAME }}
-          if-no-files-found: error
-
-      - name: Upload dSYM (for crash symbolication)
-        uses: actions/upload-artifact@v4
-        with:
-          name: ARMSX2-iOS-${{ github.sha }}-dSYM
-          path: platforms/ios/app/src/main/cpp/build/Release-iphoneos/ARMSX2iOS.app.dSYM
           if-no-files-found: error
 
   # ---- Alert on a broken master build ------------------------------------
