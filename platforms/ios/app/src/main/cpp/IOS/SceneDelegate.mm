@@ -1169,19 +1169,16 @@ static void ARMSX2StartJITKeepalive()
             }
         }
 
-        // LiveContainer case: the scene auto-rotated to landscape before
-        // sceneDidBecomeActive, so the SwiftUI child VC (connected during
-        // portrait at willConnectTo) never received viewWillTransition.
-        // Its internal sizing cache is stuck at portrait. Force a re-measure.
-        if (UIInterfaceOrientationIsLandscape(iface) && s_menuVC) {
-            CGSize attached = s_menuVC.view.bounds.size;
-            if (attached.height > attached.width) {
-                Console.WriteLn("[Layout] child VC attached portrait (%.0fx%.0f), forcing re-measure",
-                    attached.width, attached.height);
-                if ([s_menuVC respondsToSelector:@selector(forceLayoutInvalidation)]) {
-                    [(id)s_menuVC forceLayoutInvalidation];
-                }
-            }
+        // Force the SwiftUI hosting controller to re-measure on first
+        // activation. In LiveContainer the scene auto-rotates to landscape
+        // before sceneDidBecomeActive, so the child VC (connected during
+        // portrait) never received viewWillTransition -- its internal sizing
+        // cache is stale even though Auto Layout has since propagated correct
+        // bounds to the view. On native sideload this is a harmless no-op
+        // (viewWillTransition already handled it).
+        if (s_menuVC && [s_menuVC respondsToSelector:@selector(forceLayoutInvalidation)]) {
+            Console.WriteLn("[Layout] forcing hosting controller re-measure");
+            [(id)s_menuVC forceLayoutInvalidation];
         }
     });
 }
