@@ -216,6 +216,11 @@
     if (uiWindow) {
         Console.WriteLn("Attaching UIWindow to Scene...");
         uiWindow.windowScene = windowScene;
+        // SDL 3.5.0 creates the UIWindow via initWithWindowScene: (frameless),
+        // so it inherits the scene's portrait bounds at launch. SDL 3.3.0 used
+        // initWithFrame:screen.bounds (fullscreen). Restore that behavior so the
+        // window fills the screen regardless of the scene's initial orientation.
+        uiWindow.frame = windowScene.coordinateSpace.bounds;
         self.window = uiWindow;
         self.window.backgroundColor = [UIColor systemGroupedBackgroundColor];
         [self.window makeKeyAndVisible];
@@ -1133,42 +1138,6 @@ static void ARMSX2StartJITKeepalive()
 }
 
 - (void)sceneDidBecomeActive:(UIScene *)scene {
-    // Cold-launch fix: a scene-based app with UIRequiresFullScreen=true launches
-    // in the first plist orientation (Portrait) and never auto-rotates to match
-    // the device. SDL_SetWindowSize can't help here -- SDL3's UIKit_SetWindowSize
-    // is a no-op on iOS (its body is #ifdef SDL_PLATFORM_VISIONOS). The window is
-    // correctly sized for portrait; the orientation is wrong. requestGeometryUpdate
-    // rotates the scene, which fires viewWillTransition (SwiftUIHost.swift) and
-    // viewDidLayoutSubviews (sends SDL_EVENT_WINDOW_RESIZED), propagating correct
-    // landscape bounds through both the SDL window and the SwiftUI hosting layer.
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        UIWindowScene *ws = (UIWindowScene *)scene;
-        if (!self.window || !ws) return;
-
-        UIDeviceOrientation dev = [UIDevice currentDevice].orientation;
-        UIInterfaceOrientation iface = ws.interfaceOrientation;
-        Console.WriteLn("[Layout] sceneDidBecomeActive interface=%d device=%d bounds=%.0fx%.0f",
-            (int)iface, (int)dev,
-            ws.coordinateSpace.bounds.size.width, ws.coordinateSpace.bounds.size.height);
-
-        if (@available(iOS 16.0, *)) {
-            BOOL deviceLandscape = (dev == UIDeviceOrientationLandscapeLeft ||
-                                    dev == UIDeviceOrientationLandscapeRight);
-            BOOL sceneLandscape = UIInterfaceOrientationIsLandscape(iface);
-            if (deviceLandscape && !sceneLandscape) {
-                UIWindowSceneGeometryPreferencesIOS *prefs =
-                    [[UIWindowSceneGeometryPreferencesIOS alloc] init];
-                prefs.interfaceOrientations = UIInterfaceOrientationMaskLandscape;
-                [ws requestGeometryUpdateWithPreferences:prefs
-                    errorHandler:^(NSError *error) {
-                        Console.Error("[Layout] requestGeometryUpdate failed: %s",
-                            [[error localizedDescription] UTF8String]);
-                    }];
-                Console.WriteLn("[Layout] requested landscape geometry update");
-            }
-        }
-    });
 }
 
 - (void)sceneWillResignActive:(UIScene *)scene {

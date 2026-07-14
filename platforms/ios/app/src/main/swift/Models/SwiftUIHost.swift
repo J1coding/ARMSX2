@@ -6,9 +6,6 @@ import UIKit
 
 /// Custom hosting controller that respects fullScreen state for status bar hiding
 class ARMSX2HostingController<Content: View>: UIHostingController<Content> {
-
-    private var lastLayoutSize: CGSize = .zero
-
     override var prefersStatusBarHidden: Bool {
         AppState.shared.hideStatusBar
     }
@@ -51,19 +48,6 @@ class ARMSX2HostingController<Content: View>: UIHostingController<Content> {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         applyNativeContentScale(to: view)
-
-        let size = view.bounds.size
-        if lastLayoutSize != .zero {
-            let wasPortrait = lastLayoutSize.height > lastLayoutSize.width
-            let isPortrait = size.height > size.width
-            if wasPortrait != isPortrait {
-                let current = rootView
-                rootView = current
-                view.setNeedsLayout()
-                view.layoutIfNeeded()
-            }
-        }
-        lastLayoutSize = size
     }
 
     override func viewDidAppear(_ animated: Bool) {
