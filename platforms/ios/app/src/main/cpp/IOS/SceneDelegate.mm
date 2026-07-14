@@ -1168,18 +1168,6 @@ static void ARMSX2StartJITKeepalive()
                 Console.WriteLn("[Layout] requested landscape geometry update");
             }
         }
-
-        // Force the SwiftUI hosting controller to re-measure on first
-        // activation. In LiveContainer the scene auto-rotates to landscape
-        // before sceneDidBecomeActive, so the child VC (connected during
-        // portrait) never received viewWillTransition -- its internal sizing
-        // cache is stale even though Auto Layout has since propagated correct
-        // bounds to the view. On native sideload this is a harmless no-op
-        // (viewWillTransition already handled it).
-        if (s_menuVC && [s_menuVC respondsToSelector:@selector(forceLayoutInvalidation)]) {
-            Console.WriteLn("[Layout] forcing hosting controller re-measure");
-            [(id)s_menuVC forceLayoutInvalidation];
-        }
     });
 }
 
