@@ -79,6 +79,13 @@ class ARMSX2HostingController<Content: View>: UIHostingController<Content> {
         })
     }
 
+    @objc func forceLayoutInvalidation() {
+        let current = rootView
+        rootView = current
+        view.setNeedsLayout()
+        view.layoutIfNeeded()
+    }
+
     @objc private func systemChromeNeedsUpdate() {
         setNeedsStatusBarAppearanceUpdate()
         setNeedsUpdateOfHomeIndicatorAutoHidden()
