@@ -202,6 +202,9 @@ bool UIKit_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_Properti
                                 "Initial geometry request failed: %s",
                                 [[error localizedDescription] UTF8String]);
                 }];
+#else
+                // Restore fullscreen frame (SDL 3.3.0 used initWithFrame:screen.bounds).
+                uiwindow.frame = data.uiscreen.bounds;
 #endif
             }
         }
