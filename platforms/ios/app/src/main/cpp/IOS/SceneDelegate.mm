@@ -216,11 +216,6 @@
     if (uiWindow) {
         Console.WriteLn("Attaching UIWindow to Scene...");
         uiWindow.windowScene = windowScene;
-        // SDL 3.5.0 creates the UIWindow via initWithWindowScene: (frameless),
-        // so it inherits the scene's portrait bounds at launch. SDL 3.3.0 used
-        // initWithFrame:screen.bounds (fullscreen). Restore that behavior so the
-        // window fills the screen regardless of the scene's initial orientation.
-        uiWindow.frame = windowScene.coordinateSpace.bounds;
         self.window = uiWindow;
         self.window.backgroundColor = [UIColor systemGroupedBackgroundColor];
         [self.window makeKeyAndVisible];
