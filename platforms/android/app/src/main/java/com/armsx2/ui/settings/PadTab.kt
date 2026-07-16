@@ -322,19 +322,19 @@ fun PadTab(@Suppress("UNUSED_PARAMETER") state: MutableState<Settings>) {
                     }
                 }
                 // Axis correction for the LEFT stick — fixes pads that read mirrored/rotated.
-                ToggleRow(str("pad.leftStick.swapXY.label"), ControllerMappings.stickSwapXY(true),
+                ToggleRow(str("pad.leftStick.swapXY.label"), ControllerMappings.stickSwapXYScope(true, editSerial),
                     description = str("pad.leftStick.swapXY.description")) {
-                    ControllerMappings.setStickSwapXY(true, it); refreshToken.intValue++
+                    ControllerMappings.setStickSwapXY(true, it, editSerial); refreshToken.intValue++
                 }
                 SettingsDivider()
-                ToggleRow(str("pad.leftStick.invertX.label"), ControllerMappings.stickInvertX(true),
+                ToggleRow(str("pad.leftStick.invertX.label"), ControllerMappings.stickInvertXScope(true, editSerial),
                     description = str("pad.leftStick.invertX.description")) {
-                    ControllerMappings.setStickInvertX(true, it); refreshToken.intValue++
+                    ControllerMappings.setStickInvertX(true, it, editSerial); refreshToken.intValue++
                 }
                 SettingsDivider()
-                ToggleRow(str("pad.leftStick.invertY.label"), ControllerMappings.stickInvertY(true),
+                ToggleRow(str("pad.leftStick.invertY.label"), ControllerMappings.stickInvertYScope(true, editSerial),
                     description = str("pad.leftStick.invertY.description")) {
-                    ControllerMappings.setStickInvertY(true, it); refreshToken.intValue++
+                    ControllerMappings.setStickInvertY(true, it, editSerial); refreshToken.intValue++
                 }
                 SettingsDivider()
                 SegmentedRow(
@@ -355,27 +355,27 @@ fun PadTab(@Suppress("UNUSED_PARAMETER") state: MutableState<Settings>) {
                     }
                 }
                 // Axis correction for the RIGHT stick — e.g. the tester's "down is up, left is right".
-                ToggleRow(str("pad.rightStick.swapXY.label"), ControllerMappings.stickSwapXY(false),
+                ToggleRow(str("pad.rightStick.swapXY.label"), ControllerMappings.stickSwapXYScope(false, editSerial),
                     description = str("pad.rightStick.swapXY.description")) {
-                    ControllerMappings.setStickSwapXY(false, it); refreshToken.intValue++
+                    ControllerMappings.setStickSwapXY(false, it, editSerial); refreshToken.intValue++
                 }
                 SettingsDivider()
-                ToggleRow(str("pad.rightStick.invertX.label"), ControllerMappings.stickInvertX(false),
+                ToggleRow(str("pad.rightStick.invertX.label"), ControllerMappings.stickInvertXScope(false, editSerial),
                     description = str("pad.rightStick.invertX.description")) {
-                    ControllerMappings.setStickInvertX(false, it); refreshToken.intValue++
+                    ControllerMappings.setStickInvertX(false, it, editSerial); refreshToken.intValue++
                 }
                 SettingsDivider()
-                ToggleRow(str("pad.rightStick.invertY.label"), ControllerMappings.stickInvertY(false),
+                ToggleRow(str("pad.rightStick.invertY.label"), ControllerMappings.stickInvertYScope(false, editSerial),
                     description = str("pad.rightStick.invertY.description")) {
-                    ControllerMappings.setStickInvertY(false, it); refreshToken.intValue++
+                    ControllerMappings.setStickInvertY(false, it, editSerial); refreshToken.intValue++
                 }
                 SettingsDivider()
                 ToggleRow(
                     str("pad.dpadAsLeftStick.label"),
-                    ControllerMappings.dpadAsLeftStick(),
+                    ControllerMappings.dpadAsLeftStickScope(editSerial),
                     description = str("pad.dpadAsLeftStick.description"),
                 ) {
-                    ControllerMappings.setDpadAsLeftStick(it)
+                    ControllerMappings.setDpadAsLeftStick(it, editSerial)
                     refreshToken.intValue++
                 }
                 SettingsDivider()
@@ -386,6 +386,10 @@ fun PadTab(@Suppress("UNUSED_PARAMETER") state: MutableState<Settings>) {
                 StickFeelSliders(left = false, title = str("pad.rightStickFeel.title"), refreshToken = refreshToken)
             }
         }
+        // Motion / gyroscope controls. Shared with the in-game pause menu's Controls tab
+        // (com.armsx2.ui.settings.GyroSection). Here it follows the Pad tab's Global/Game
+        // scope (editSerial) and shares the tab's refreshToken so it re-reads live.
+        GyroSection(editSerial = editSerial, externalRefresh = refreshToken)
         CollapsibleSection(str("pad.section.buttonMapping"), initiallyExpanded = false) {
             ControllerMappings.actions.forEach { action ->
                 val physical = ControllerMappings.physicalForScope(action, editPlayer.intValue, editSerial)
@@ -715,6 +719,102 @@ private fun StickPickItem(label: String, selected: Boolean, onClick: () -> Unit)
             fontSize = 16.sp,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
         )
+    }
+}
+
+/**
+ * Motion / gyroscope controls, shared by the Pad settings tab and the in-game pause
+ * menu's Controls tab. [editSerial] selects Global (null) vs per-game scope. Pass
+ * [externalRefresh] to share a parent's live-refresh token (the Pad tab does so its
+ * scope toggle refreshes every section together); otherwise an internal token drives
+ * live re-reads of the raw-pref values Compose can't observe on its own.
+ */
+@Composable
+internal fun GyroSection(
+    editSerial: String? = null,
+    externalRefresh: androidx.compose.runtime.MutableIntState? = null,
+) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val localToken = remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    val refreshToken = externalRefresh ?: localToken
+    CollapsibleSection(str("pad.gyro.section"), initiallyExpanded = false) {
+        @Suppress("UNUSED_EXPRESSION")
+        refreshToken.intValue
+        val gyroMode = ControllerMappings.gyroModeScope(editSerial)
+        SegmentedRow(
+            label = str("pad.gyro.mode.label"),
+            options = listOf(
+                str("pad.gyro.mode.off"),
+                str("pad.gyro.mode.aim"),
+                str("pad.gyro.mode.steering"),
+            ),
+            selectedIndex = gyroMode,
+            onChange = {
+                ControllerMappings.setGyroMode(it, editSerial)
+                refreshToken.intValue++
+            },
+        )
+        // Which analog stick Aim mode drives — Right for most FPS, Left for games that
+        // aim with the left stick (e.g. Resident Evil 4). Only shown in Aim mode.
+        if (gyroMode == ControllerMappings.GYRO_AIM) {
+            SegmentedRow(
+                label = str("pad.gyro.aimStick.label"),
+                options = listOf(str("pad.gyro.aimStick.right"), str("pad.gyro.aimStick.left")),
+                selectedIndex = ControllerMappings.gyroAimStickScope(editSerial),
+                onChange = {
+                    ControllerMappings.setGyroAimStick(it, editSerial)
+                    refreshToken.intValue++
+                },
+            )
+        }
+        // Warn when the picked mode's sensor is missing on this device (aim needs a
+        // gyroscope, steering the game rotation vector). The manifest declares the
+        // feature not-required, so such devices still install.
+        if (gyroMode != 0 &&
+            !com.armsx2.input.AndroidGyroscopeInput.isModeAvailable(ctx, gyroMode)) {
+            HelpText(str("pad.gyro.unavailable"))
+        }
+        SettingsDivider()
+        IntSliderRow(
+            label = str("pad.gyro.sensitivity.label"),
+            value = ControllerMappings.gyroSensitivityScope(editSerial),
+            min = 25,
+            max = 300,
+            valueFormatter = { "${it}%" },
+            onChange = {
+                ControllerMappings.setGyroSensitivity(it, editSerial)
+                refreshToken.intValue++
+            },
+        )
+        SettingsDivider()
+        IntSliderRow(
+            label = str("pad.gyro.smoothing.label"),
+            value = ControllerMappings.gyroSmoothingScope(editSerial),
+            min = 0,
+            max = 90,
+            valueFormatter = { "${it}%" },
+            onChange = {
+                ControllerMappings.setGyroSmoothing(it, editSerial)
+                refreshToken.intValue++
+            },
+        )
+        SettingsDivider()
+        ToggleRow(
+            str("pad.gyro.invertX.label"),
+            ControllerMappings.gyroInvertXScope(editSerial),
+        ) {
+            ControllerMappings.setGyroInvertX(it, editSerial)
+            refreshToken.intValue++
+        }
+        SettingsDivider()
+        ToggleRow(
+            str("pad.gyro.invertY.label"),
+            ControllerMappings.gyroInvertYScope(editSerial),
+        ) {
+            ControllerMappings.setGyroInvertY(it, editSerial)
+            refreshToken.intValue++
+        }
+        SettingsDivider()
     }
 }
 

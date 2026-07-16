@@ -211,6 +211,10 @@ public class NativeApp {
 	 *  {@link #getAchievementsJSON}. */
 	public static native void setAchievementsOption(String key, boolean enabled);
 
+	// Custom achievement-unlock sound. `path` is an app-private absolute file the
+	// MediaPlayer can read; an empty string clears it back to the bundled default.
+	public static native void setAchievementsUnlockSound(String path);
+
 	/** Repoint the RetroAchievements client at a loopback proxy. Persists
 	 *  the [Achievements] Host setting (read by CreateClient), forces
 	 *  hardcore off while active — saving the prior choice — and rebuilds
@@ -230,6 +234,12 @@ public class NativeApp {
 	/** Master OSD toggle — flips every OsdShow* bit we enable at first
 	 *  init. Backs the in-game overlay's OSD pill. */
 	public static native void osdShowAll(boolean enabled);
+
+	// Live-only OSD flag apply (no persist) — lets the OSD on/off hotkey hide/restore stats
+	// without clobbering the user's saved per-stat selection.
+	public static native void osdApplyFlags(boolean fps, boolean vps, boolean speed, boolean cpu,
+		boolean gpu, boolean res, boolean gsStats, boolean frameTimes, boolean hwInfo,
+		boolean version, boolean settings, boolean inputs);
 
 	/** Per-element OSD toggles (Performance Overlay tab). Apply live via
 	 *  EmuConfig.GS + MTGS::ApplySettings; persistence to base is done on
@@ -336,21 +346,35 @@ public class NativeApp {
 	// Uses MediaPlayer, not SoundPool: SoundPool decoded/resampled the 44.1 kHz
 	// stereo PCM oddly and it came out "weird". MediaPlayer plays the .wav straight,
 	// matching desktop PCSX2. One short-lived player per shot, released on complete.
+	// Strong references to the currently-playing sound players. Without this the
+	// MediaPlayer below is a pure local; once start() returns and the worker thread
+	// exits, nothing roots it, so the GC (very active under a running emulator) could
+	// finalize and release it MID-PLAYBACK — that's why unlock sounds dropped at random
+	// with no error logged. Held from before start() until the completion/error callback.
+	private static final java.util.Set<android.media.MediaPlayer> sActiveSounds =
+			java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+
 	public static void playSound(String path) {
 		if (path == null || path.isEmpty()) return;
+		// Cap concurrent players — a burst of simultaneous unlocks (combo/milestone) could
+		// otherwise exhaust the device's MediaPlayer/codec pool and make start() no-op.
+		if (sActiveSounds.size() >= 4) return;
 		new Thread(() -> {
+			android.media.MediaPlayer mp = null;
 			try {
-				android.media.MediaPlayer mp = new android.media.MediaPlayer();
+				mp = new android.media.MediaPlayer();
 				mp.setAudioAttributes(new android.media.AudioAttributes.Builder()
 						.setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
 						.setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
 						.build());
 				mp.setDataSource(path);
-				mp.setOnCompletionListener(m -> { try { m.release(); } catch (Throwable ignore) {} });
-				mp.setOnErrorListener((m, what, extra) -> { try { m.release(); } catch (Throwable ignore) {} return true; });
+				mp.setOnCompletionListener(m -> { sActiveSounds.remove(m); try { m.release(); } catch (Throwable ignore) {} });
+				mp.setOnErrorListener((m, what, extra) -> { sActiveSounds.remove(m); try { m.release(); } catch (Throwable ignore) {} return true; });
+				sActiveSounds.add(mp);
 				mp.prepare();
 				mp.start();
 			} catch (Throwable t) {
+				if (mp != null) { sActiveSounds.remove(mp); try { mp.release(); } catch (Throwable ignore) {} }
 				android.util.Log.e("ARMSX2", "playSound failed: " + path, t);
 			}
 		}, "armsx2-ra-sound").start();
@@ -654,6 +678,11 @@ public class NativeApp {
 	public static native boolean hasAutosaveState();
 	public static native byte[] getAutosaveImage();
 	public static native String getAutosaveGamePath();
+	// Frames the GS has presented since it opened (host-side, not saved in the state). The
+	// auto-load-on-boot path waits until this is advancing before restoring, so the load happens
+	// once the renderer is actually presenting — otherwise the restored frame never reaches the
+	// surface and the screen stays black.
+	public static native int getPresentedFrameCount();
 
 	public static void vmSetPaused(boolean paused) {
 		new Handler(Looper.getMainLooper()).post(() -> {

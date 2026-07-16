@@ -33,6 +33,7 @@
 #include "GS/Renderers/Vulkan/VKShaderCache.h"
 #include "GSDumpReplayer.h"
 #include "ImGui/ImGuiManager.h"
+#include "ImGui/ImGuiOverlays.h"
 #include "common/Path.h"
 #include "common/MemorySettingsInterface.h"
 #include "common/SettingsWrapper.h"
@@ -617,6 +618,23 @@ Java_kr_co_iefriends_pcsx2_NativeApp_setAchievementsOption(JNIEnv *env, jclass c
         VMManager::ApplySettings();
 }
 
+// Custom achievement-unlock sound. Writes the [Achievements] UnlockSoundName path
+// (an app-private absolute file the MediaPlayer reads on unlock) and enables the
+// specific-sound path. An empty path clears it, so PlayAchievementSound falls back
+// to the bundled default. Persisted to the base INI so it survives restarts.
+extern "C"
+JNIEXPORT void JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_setAchievementsUnlockSound(JNIEnv *env, jclass clazz,
+                                                                jstring p_path) {
+    const std::string path = GetJavaString(env, p_path);
+    Host::SetBaseStringSettingValue("Achievements", "UnlockSoundName", path.c_str());
+    Host::SetBaseBoolSettingValue("Achievements", "UnlockSound", true);
+    if (s_settings_interface && s_settings_interface->IsDirty())
+        s_settings_interface->Save();
+    if (VMManager::HasValidVM())
+        VMManager::ApplySettings();
+}
+
 // Rebuild the rc_client so CreateClient re-reads the [Achievements] Host
 // setting. UpdateSettings' diff path never re-creates the client on a Host
 // change, so a live host switch needs an explicit teardown/reinit. No-op
@@ -771,6 +789,10 @@ static void applyPadButton(u32 port, jint p_key, jint p_range, jboolean p_keyPre
     const float state = p_keyPressed
         ? ((p_range > 0) ? (p_range / 32767.0f) : 1.0f)
         : 0.0f;
+    // Pad input can arrive with no VM running (e.g. the gyroscope overlay emits a neutral
+    // release when it first composes in the library) — the pads don't exist yet, so drop it.
+    if (!VMManager::HasValidVM())
+        return;
     std::lock_guard<std::mutex> lk(s_pad_mutex);
     Pad::SetControllerState(port, static_cast<u32>(_key), state);
 }
@@ -1283,6 +1305,7 @@ Java_kr_co_iefriends_pcsx2_NativeApp_applyGSSettingsLive(JNIEnv *env, jclass cla
     const auto saved_no_shader_cache = EmuConfig.GS.DisableShaderCache;
     const auto saved_no_fb_fetch     = EmuConfig.GS.DisableFramebufferFetch;
     const auto saved_adreno_fbfetch  = EmuConfig.GS.EnableAdrenoFramebufferFetch;
+    const auto saved_mali_fbfetch    = EmuConfig.GS.ForceMaliFramebufferFetch;
     const auto saved_no_vs_expand    = EmuConfig.GS.DisableVertexShaderExpand;
     const auto saved_tex_barriers    = EmuConfig.GS.OverrideTextureBarriers;
     const auto saved_depth_feedback  = EmuConfig.GS.DepthFeedbackMode;
@@ -1309,6 +1332,7 @@ Java_kr_co_iefriends_pcsx2_NativeApp_applyGSSettingsLive(JNIEnv *env, jclass cla
     EmuConfig.GS.DisableShaderCache         = saved_no_shader_cache;
     EmuConfig.GS.DisableFramebufferFetch    = saved_no_fb_fetch;
     EmuConfig.GS.EnableAdrenoFramebufferFetch = saved_adreno_fbfetch;
+    EmuConfig.GS.ForceMaliFramebufferFetch  = saved_mali_fbfetch;
     EmuConfig.GS.DisableVertexShaderExpand  = saved_no_vs_expand;
     EmuConfig.GS.OverrideTextureBarriers    = saved_tex_barriers;
     EmuConfig.GS.DepthFeedbackMode          = saved_depth_feedback;
@@ -2268,7 +2292,14 @@ Java_kr_co_iefriends_pcsx2_NativeApp_loadStateFromSlot(JNIEnv *env, jclass clazz
         Console.Error("loadStateFromSlot: CPU thread failed to park, refusing to load");
         return false;
     }
-    return VMManager::LoadStateFromSlot(p_slot);
+    const bool loaded = VMManager::LoadStateFromSlot(p_slot);
+    // A normal LoadState does not present (only the input-recording path does), so the restored
+    // frame isn't shown until the game draws its next frame. When the game is already running
+    // that's the next vsync (imperceptible), but a load early in boot — before the present loop
+    // is flowing — otherwise leaves a black screen. Force the restored frame to display now.
+    if (loaded)
+        MTGS::PresentCurrentFrame();
+    return loaded;
 }
 
 extern "C"
@@ -2424,7 +2455,25 @@ Java_kr_co_iefriends_pcsx2_NativeApp_loadAutosaveState(JNIEnv *env, jclass clazz
         Console.Error("loadAutosaveState: CPU thread failed to park, refusing to load");
         return false;
     }
-    return VMManager::LoadStateFromSlot(VMManager::SAVESTATE_SLOT_AUTOSAVE);
+    const bool loaded = VMManager::LoadStateFromSlot(VMManager::SAVESTATE_SLOT_AUTOSAVE);
+    // Force the restored frame to display — this load fires during boot (auto-load / Save+Quit
+    // resume), before the game has drawn its first frame, so without an explicit present the
+    // screen stays black until the game happens to redraw. See loadStateFromSlot.
+    if (loaded)
+        MTGS::PresentCurrentFrame();
+    return loaded;
+}
+
+// Host-side count of frames the GS has presented since it opened (g_perfmon frame counter, NOT
+// part of the savestate). The auto-load-on-boot path polls this so it only restores the state
+// once the renderer is actually presenting frames — loading before the present loop is flowing
+// leaves a black screen (the restored frame never reaches the surface).
+extern "C"
+JNIEXPORT jint JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_getPresentedFrameCount(JNIEnv *env, jclass clazz) {
+    if (!VMManager::HasValidVM())
+        return 0;
+    return static_cast<jint>(g_perfmon.GetFrame());
 }
 
 extern "C"
@@ -3099,6 +3148,17 @@ static void applyOsdSetting()
     GSConfig.OsdShowInputs = EmuConfig.GS.OsdShowInputs;
     GSConfig.OsdMessagesPos = EmuConfig.GS.OsdMessagesPos;
     GSConfig.OsdScale = EmuConfig.GS.OsdScale;
+    // Record the user's authoritative OSD choice for the overlay renderer. This snapshot
+    // is immune to VMManager::ApplySettings (which re-derives EmuConfig.GS from the layered
+    // settings and could otherwise resurrect an OSD the user just turned off). Every OSD
+    // setter (osdShow*, osdShowAll, osdApplyFlags) funnels through here, so this always
+    // reflects the last explicit choice.
+    ImGuiManager::SetAndroidOSDVisibility(
+        EmuConfig.GS.OsdShowFPS, EmuConfig.GS.OsdShowVPS, EmuConfig.GS.OsdShowSpeed,
+        EmuConfig.GS.OsdShowResolution, EmuConfig.GS.OsdShowCPU, EmuConfig.GS.OsdShowGPU,
+        EmuConfig.GS.OsdShowGSStats, EmuConfig.GS.OsdShowFrameTimes, EmuConfig.GS.OsdShowHardwareInfo,
+        EmuConfig.GS.OsdShowVersion, EmuConfig.GS.OsdShowGPUStats, EmuConfig.GS.OsdShowSettings,
+        EmuConfig.GS.OsdShowInputs);
     if (MTGS::IsOpen())
         MTGS::ApplySettings();
 }
@@ -3235,6 +3295,31 @@ Java_kr_co_iefriends_pcsx2_NativeApp_osdShowAll(JNIEnv*, jclass, jboolean enable
     if (s_settings_interface && s_settings_interface->IsDirty())
         s_settings_interface->Save();
 
+    applyOsdSetting();
+}
+
+// Live-only OSD flag apply — writes EmuConfig.GS.* (read per-frame by the OSD renderer) but does
+// NOT persist to the settings store. The OSD on/off hotkey uses this to hide/restore the on-screen
+// stats without clobbering the user's saved per-stat selection: on hide it pushes all-false, on
+// show it pushes the user's saved Settings values back. Because s_settings_interface is untouched,
+// the stored selection survives — fixing the "hotkey resets my chosen stats" report.
+extern "C" JNIEXPORT void JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_osdApplyFlags(JNIEnv*, jclass,
+    jboolean fps, jboolean vps, jboolean speed, jboolean cpu, jboolean gpu,
+    jboolean res, jboolean gsStats, jboolean frameTimes, jboolean hwInfo,
+    jboolean version, jboolean settings, jboolean inputs) {
+    EmuConfig.GS.OsdShowFPS = fps;
+    EmuConfig.GS.OsdShowVPS = vps;
+    EmuConfig.GS.OsdShowSpeed = speed;
+    EmuConfig.GS.OsdShowCPU = cpu;
+    EmuConfig.GS.OsdShowGPU = gpu;
+    EmuConfig.GS.OsdShowResolution = res;
+    EmuConfig.GS.OsdShowGSStats = gsStats;
+    EmuConfig.GS.OsdShowFrameTimes = frameTimes;
+    EmuConfig.GS.OsdShowHardwareInfo = hwInfo;
+    EmuConfig.GS.OsdShowVersion = version;
+    EmuConfig.GS.OsdShowSettings = settings;
+    EmuConfig.GS.OsdShowInputs = inputs;
     applyOsdSetting();
 }
 

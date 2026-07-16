@@ -19,6 +19,13 @@
 #include "imgui.h"
 #include "IconsFontAwesome.h"
 
+#ifdef ARMSX2_HAS_LIBRASHADER
+// librashader only declares its OpenGL entry points when the consumer opts in. Defined by
+// CMake only when the Rust toolchain actually produced the library.
+#define LIBRA_RUNTIME_OPENGL
+#include "librashader.h"
+#endif
+
 #include <cinttypes>
 #include <fstream>
 #include <sstream>
@@ -717,6 +724,9 @@ bool GSDeviceOGL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 
 void GSDeviceOGL::Destroy()
 {
+	// Frees GL objects, so it has to run before the context is dropped below.
+	DestroyShaderChain();
+
 	GSDevice::Destroy();
 
 	if (m_gl_context)
@@ -807,11 +817,19 @@ bool GSDeviceOGL::CheckFeatures()
 	}
 
 #if defined(__ANDROID__)
+	// ANGLE (GLES-on-Vulkan) reports the underlying GPU in GL_RENDERER, e.g.
+	// "ANGLE (ARM, Vulkan 1.1.177 (Mali-G77 MC9 ...))", so the native Mali profile and its vendor
+	// extensions (GL_ARM_shader_framebuffer_fetch, tile optimisations) engage through ANGLE too —
+	// and that is desirable: they are a large performance win on Mali (dropping them measurably
+	// regressed FPS on Mali-G615). The Mali-G77 crash under ANGLE was NOT these hacks but stale
+	// program binaries from the native driver being fed to ANGLE's glProgramBinary(); that is
+	// fixed at the source in GLShaderCache (driver-keyed cache), so no per-GPU profile gating here.
 	const GpuProfileSelection profile_selection =
 		GpuProfileDetector::Resolve(GSConfig.AndroidGpuProfileOverride, vendor_str, renderer_str);
 	SetRuntimeGPUProfile(profile_selection.runtime_profile);
 	SetMobileGPUIdentity(profile_selection.gpu);
 	SetMobileGSTuning(profile_selection.gs_tuning);
+	SetMediaTekSoC(profile_selection.is_mediatek_soc);
 	Console.WriteLn("GL: GPU profile override='%s' resolved='%s'.",
 		GpuProfileDetector::OverrideToConfigString(profile_selection.override_mode),
 		GpuProfileDetector::RuntimeProfileToString(profile_selection.runtime_profile));
@@ -906,6 +924,39 @@ bool GSDeviceOGL::CheckFeatures()
 	{
 		Console.Warning("GL_ARB_direct_state_access is not supported, this will reduce performance.");
 		Emulate_DSA::Init();
+	}
+
+	// glDrawElementsBaseVertex entered core in GL ES 3.2. ANGLE-over-Vulkan caps its context at
+	// ES 3.1, so GLAD leaves the UNSUFFIXED core pointer NULL even though ANGLE advertises
+	// GL_OES/EXT_draw_elements_base_vertex (whose suffixed entry points ARE loaded). Every draw
+	// path calls the unsuffixed glDrawElementsBaseVertex directly (RenderImGui + DrawIndexedPrimitive),
+	// so on ANGLE the first overlay draw jumped to a null pointer and aborted via the fastmem SIGSEGV
+	// handler (Mali-G77 / Retroid Pocket 4 Pro). Native Mali/Adreno report ES 3.2 so the core pointer
+	// is non-null there — which is why this only bit ANGLE. Alias it to the OES/EXT variant, matching
+	// the glTextureBarrier = glTextureBarrierNV replacement above. Fixes all call sites at once.
+	if (!glDrawElementsBaseVertex)
+	{
+		if (GLAD_GL_OES_draw_elements_base_vertex && glDrawElementsBaseVertexOES)
+			glDrawElementsBaseVertex = glDrawElementsBaseVertexOES;
+		else if (GLAD_GL_EXT_draw_elements_base_vertex && glDrawElementsBaseVertexEXT)
+			glDrawElementsBaseVertex = glDrawElementsBaseVertexEXT;
+		else
+			Console.Error("GL: glDrawElementsBaseVertex is unavailable (no core/OES/EXT) — draws will fail.");
+	}
+
+	// glColorMaski (indexed color mask) is core in GLSL ES 3.2 but only extension-provided on
+	// an ES 3.1 context; GLAD leaves the unsuffixed pointer null on ANGLE (which caps at ES 3.1),
+	// so GSDeviceOGL::OMSetColorMaskState calls a null pointer → SIGSEGV mid-render (VSync→Merge→
+	// GetOutput→StretchRect). ANGLE exposes the suffixed variant via GL_OES/EXT_draw_buffers_indexed,
+	// so alias to it. Same class of fix as glDrawElementsBaseVertex above.
+	if (!glColorMaski)
+	{
+		if (GLAD_GL_OES_draw_buffers_indexed && glColorMaskiOES)
+			glColorMaski = glColorMaskiOES;
+		else if (GLAD_GL_EXT_draw_buffers_indexed && glColorMaskiEXT)
+			glColorMaski = glColorMaskiEXT;
+		else
+			Console.Error("GL: glColorMaski is unavailable (no core/OES/EXT) — draws will fail.");
 	}
 
 	// Don't use PBOs when we don't have ARB_buffer_storage, orphaning buffers probably ends up worse than just
@@ -1859,6 +1910,21 @@ std::string GSDeviceOGL::GenGlslHeader(const std::string_view entry, GLenum type
         else if (GLAD_GL_ES_VERSION_3_1)
             header = "#version 310 es\n";
 
+        // Vertex↔fragment interface blocks (out/in SHADER {}) are core only in GLSL ES
+        // 3.20. On an ES 3.1 context — notably ANGLE, which reports ES 3.1 and validates
+        // shaders strictly — they must be enabled explicitly or every TFX shader fails with
+        // "'out' : invalid qualifier: shader IO blocks need shader io block extension",
+        // leaving no valid programs (black screen, and downstream crashes when a null
+        // program is later bound). Native Mali is lenient and compiled these fine without
+        // it; ANGLE does not. Harmless where already core.
+        if (!GLAD_GL_ES_VERSION_3_2)
+        {
+            if (GLAD_GL_EXT_shader_io_blocks)
+                header += "#extension GL_EXT_shader_io_blocks : enable\n";
+            else if (GLAD_GL_OES_shader_io_blocks)
+                header += "#extension GL_OES_shader_io_blocks : enable\n";
+        }
+
         if (GLAD_GL_EXT_blend_func_extended)
             header += "#extension GL_EXT_blend_func_extended : require\n";
         if (GLAD_GL_ARB_blend_func_extended)
@@ -2570,6 +2636,184 @@ void GSDeviceOGL::DoFXAA(GSTexture* sTex, GSTexture* dTex)
 	const GSVector4 dRect(0, 0, s.x, s.y);
 
 	DoStretchRect(sTex, sRect, dTex, dRect, m_fxaa.ps, Biln);
+}
+
+#ifdef ARMSX2_HAS_LIBRASHADER
+
+static void ReportShaderChainError(const char* what, libra_error_t err)
+{
+	char* msg = nullptr;
+	if (libra_error_write(err, &msg) == 0 && msg)
+	{
+		Console.Error("(GS) librashader GL: %s failed: %s", what, msg);
+		libra_error_free_string(&msg);
+	}
+	else
+	{
+		Console.Error("(GS) librashader GL: %s failed (errno %d)", what, static_cast<int>(libra_error_errno(err)));
+	}
+	libra_error_free(&err);
+}
+
+// libra_gl_loader_t is a bare C function pointer with no userdata argument, so the context
+// has to be reachable without one. Only ever one GL device exists at a time (g_gs_device),
+// and the chain is created and run on the GS thread, so a file-static set at create time is
+// enough — no need to thread the device through.
+static GLContext* s_shader_chain_gl_context = nullptr;
+
+static const void* ShaderChainGLLoader(const char* name)
+{
+	return s_shader_chain_gl_context ? s_shader_chain_gl_context->GetProcAddress(name) : nullptr;
+}
+
+#endif
+
+void GSDeviceOGL::DestroyShaderChain()
+{
+#ifdef ARMSX2_HAS_LIBRASHADER
+	if (m_shader_chain)
+	{
+		libra_gl_filter_chain_t chain = static_cast<libra_gl_filter_chain_t>(m_shader_chain);
+		libra_gl_filter_chain_free(&chain);
+		m_shader_chain = nullptr;
+	}
+#endif
+	m_shader_chain_preset.clear();
+	m_shader_chain_failed = false;
+	m_shader_frame_count = 0;
+}
+
+void GSDeviceOGL::RestoreGLStateAfterShaderChain()
+{
+	// librashader backs up and restores the fixed-function *enables* itself (BLEND,
+	// CULL_FACE, DEPTH_TEST, STENCIL_TEST, SCISSOR_TEST, and PRIMITIVE_RESTART /
+	// FRAMEBUFFER_SRGB where supported) via an RAII guard, and it never touches the blend
+	// func/equation, depth func/mask, stencil func/op, or the scissor box — so all of those
+	// stay in sync with GLState on their own. What it does clobber and leave behind is the
+	// bound FBO (documented as "GL_FRAMEBUFFER is bound to 0" on return), VAO, program,
+	// texture units, sampler bindings, the viewport and the colour mask.
+	//
+	// GLState's setters are all early-return-if-unchanged, so a stale cache means the state
+	// would never be re-pushed and the next draw would silently render wrong. Rather than
+	// invalidate the cache (it has no "unknown" sentinel — GLState::Clear() asserts defaults,
+	// which is only true on a fresh context), push the cached values back into the driver so
+	// reality matches the cache again. Same shape as the end of RenderImGui().
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, GLState::fbo);
+	glBindVertexArray(GLState::vao);
+	glViewport(0, 0, GLState::viewport.x, GLState::viewport.y);
+
+	const OMColorMaskSelector cms(GLState::wrgba);
+	glColorMaski(0, cms.wr, cms.wg, cms.wb, cms.wa);
+
+	// The chain binds a texture and a sampler per pass, starting at unit 0. Only the units
+	// GLState tracks matter; anything above them is never sampled by the TFX/utility draws.
+	for (u32 i = 0; i < std::size(GLState::tex_unit); i++)
+		glBindTextureUnit(i, GLState::tex_unit[i]);
+
+	// Sampler unit 0 is the tracked one. Unit 1 is special: m_palette_ss is bound there once
+	// at device creation and is expected to stay put for the device's lifetime (a sampler
+	// object can't be shared across image units, hence the dedicated one), so it has to be
+	// put back explicitly or every paletted texture silently samples wrong from here on.
+	// GSDeviceOGL never binds a sampler to the remaining units and expects them to fall back
+	// to the texture's own parameters, so any the chain left behind have to come back off.
+	glBindSampler(0, GLState::ps_ss);
+	glBindSampler(1, m_palette_ss);
+	for (u32 i = 2; i < std::size(GLState::tex_unit); i++)
+		glBindSampler(i, 0);
+
+	// The program cache is a file-static in GLProgram rather than part of GLState, and it
+	// has a purpose-built invalidator; the next Bind() re-pushes.
+	GLProgram::ResetLastProgram();
+}
+
+bool GSDeviceOGL::DoApplyShaderChain(GSTexture* sTex, GSTexture* dTex)
+{
+#ifndef ARMSX2_HAS_LIBRASHADER
+	return false;
+#else
+	// A preset that fails to compile must not be retried every frame — that would run a
+	// full slang compile 60x/sec. Latch the failure until the user picks another preset.
+	if (m_shader_chain_failed && m_shader_chain_preset == GSConfig.ShaderChainPreset)
+		return false;
+
+	if (!m_shader_chain || m_shader_chain_preset != GSConfig.ShaderChainPreset)
+	{
+		DestroyShaderChain();
+		m_shader_chain_preset = GSConfig.ShaderChainPreset;
+
+		libra_shader_preset_t preset = nullptr;
+		if (libra_error_t err = libra_preset_create(m_shader_chain_preset.c_str(), &preset))
+		{
+			ReportShaderChainError("preset load", err);
+			m_shader_chain_failed = true;
+			return false;
+		}
+
+		filter_chain_gl_opt_t opt = {};
+		opt.version = LIBRASHADER_CURRENT_VERSION;
+		// 0 means "detect from the context": librashader asks glow for the version and picks
+		// GLSL 300/310/320 ES on an ES context. Hardcoding 330 would emit desktop GLSL and
+		// break every GLES device.
+		opt.glsl_version = 0;
+		// DSA is GL 4.5+ and simply does not exist on GLES. This implicitly disables
+		// librashader's own shader cache, which is the documented trade-off.
+		opt.use_dsa = false;
+		opt.force_no_mipmaps = false;
+		opt.disable_cache = false;
+
+		// librashader resolves GL through this loader rather than linking it, the same way
+		// the Vulkan chain rides the user's ICD.
+		s_shader_chain_gl_context = m_gl_context.get();
+
+		// create() invalidates `preset` unconditionally ("the shader preset is
+		// immediately invalidated"), so it must NOT be freed afterwards on either path.
+		libra_gl_filter_chain_t chain = nullptr;
+		if (libra_error_t err = libra_gl_filter_chain_create(&preset, ShaderChainGLLoader, &opt, &chain))
+		{
+			ReportShaderChainError("chain create", err);
+			m_shader_chain_failed = true;
+			return false;
+		}
+
+		m_shader_chain = chain;
+		m_shader_frame_count = 0;
+		Console.WriteLn("(GS) librashader GL: loaded preset '%s'", m_shader_chain_preset.c_str());
+	}
+
+	GL_PUSH("ApplyShaderChain");
+
+	GSTextureOGL* const src = static_cast<GSTextureOGL*>(sTex);
+	GSTextureOGL* const dst = static_cast<GSTextureOGL*>(dTex);
+
+	// librashader wants the sized internal format the texture was allocated with — that's
+	// m_gl_format (GL_RGBA8), the one handed to glTextureStorage2D, NOT m_int_format, which
+	// despite the name is the pixel-transfer format (GL_RGBA).
+	const libra_image_gl_t in = {src->GetID(), src->GetGLFormat(),
+		static_cast<uint32_t>(src->GetWidth()), static_cast<uint32_t>(src->GetHeight())};
+	const libra_image_gl_t out = {dst->GetID(), dst->GetGLFormat(),
+		static_cast<uint32_t>(dst->GetWidth()), static_cast<uint32_t>(dst->GetHeight())};
+	const libra_viewport_t vp = {0.0f, 0.0f,
+		static_cast<uint32_t>(dst->GetWidth()), static_cast<uint32_t>(dst->GetHeight())};
+
+	// Every librashader entry point takes the chain handle by address, not by value.
+	// Unlike Vulkan there's no command buffer — the chain issues its draws immediately.
+	libra_gl_filter_chain_t chain = static_cast<libra_gl_filter_chain_t>(m_shader_chain);
+	const libra_error_t err = libra_gl_filter_chain_frame(&chain, m_shader_frame_count, in, out, &vp, nullptr, nullptr);
+
+	// Unconditional: the chain can fail part-way through, having already clobbered state.
+	RestoreGLStateAfterShaderChain();
+
+	if (err)
+	{
+		ReportShaderChainError("frame", err);
+		m_shader_chain_failed = true;
+		return false;
+	}
+	m_shader_frame_count++;
+
+	dst->SetState(GSTexture::State::Dirty);
+	return true;
+#endif
 }
 
 bool GSDeviceOGL::CompileShadeBoostProgram()

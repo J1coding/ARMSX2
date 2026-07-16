@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -91,6 +92,46 @@ fun TouchControlsOverlay() {
     LaunchedEffect(gameSerial, MainActivityRuntime.eState.value) {
         if (MainActivityRuntime.eState.value == EmuState.RUNNING || MainActivityRuntime.eState.value == EmuState.PAUSED)
             TouchControls.applyForSerial(gameSerial)
+    }
+    // ---- Gyroscope / motion controls -------------------------------------
+    // Drive a PS2 analog stick from the device's motion sensors while the game runs.
+    // AIM (mode 1) -> RIGHT stick, STEERING (mode 2) -> LEFT stick. The reader emits a
+    // normalized (x, y); we split each axis into its pair of native direction keycodes
+    // (mirroring applyStickDiff below), so the gyro rides the same pad path as the
+    // on-screen sticks. Kept ABOVE the visibility early-returns so it isn't torn down
+    // when the pause/library overlay shows. Keyed on eState + the gyro tunables so it
+    // re-registers when the game starts/stops or a setting changes, and unregisters
+    // (with a 0,0 release) on pause/exit — sensors are battery-hungry and a stuck stick
+    // would otherwise linger. setPadButton is mutex-guarded natively; callbacks arrive
+    // on the main looper, so no extra sync here.
+    val context = LocalContext.current
+    val gyro = remember {
+        com.armsx2.input.AndroidGyroscopeInput(context) { mode, x, y ->
+            // Fold the gyro into the shared analog-merge layer as a SIGNED addend on
+            // the physical stick that shares its axis (aim -> right or the user-chosen
+            // left for RE4-style games; steer -> left) instead of writing the stick
+            // codes raw. That lets coarse stick aim and fine gyro adjustment run at
+            // once — before, whichever moved last clobbered the other. The combine
+            // (and the P1 physical-stick state it sums with) lives in the runtime.
+            MainActivityRuntime.instance?.onGyroAnalog(mode, x, y)
+        }
+    }
+    val gyroMode = ControllerMappings.gyroMode()
+    DisposableEffect(MainActivityRuntime.eState.value, gyroMode,
+            ControllerMappings.gyroSensitivity(),
+            ControllerMappings.gyroSmoothing(),
+            ControllerMappings.gyroInvertX(),
+            ControllerMappings.gyroInvertY()) {
+        if (MainActivityRuntime.eState.value == EmuState.RUNNING && gyroMode != 0) {
+            gyro.start(gyroMode,
+                ControllerMappings.gyroSensitivity(),
+                ControllerMappings.gyroSmoothing(),
+                ControllerMappings.gyroInvertX(),
+                ControllerMappings.gyroInvertY())
+        } else {
+            gyro.stop()
+        }
+        onDispose { gyro.stop() }
     }
     val edit = TouchControls.editMode.value
     val running = MainActivityRuntime.eState.value == EmuState.RUNNING ||

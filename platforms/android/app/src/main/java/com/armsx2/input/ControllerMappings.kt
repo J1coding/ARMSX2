@@ -116,6 +116,16 @@ object ControllerMappings {
         return MainActivityRuntime.prefs.getString(baseKey, default) ?: default
     }
 
+    /** Read a boolean pref: per-game override (for the active game) first, else global. */
+    private fun resolveBoolean(baseKey: String, default: Boolean): Boolean {
+        val s = runtimeSerial()
+        if (s != null) {
+            val gk = gameKey(s, baseKey)
+            if (MainActivityRuntime.prefs.contains(gk)) return MainActivityRuntime.prefs.getBoolean(gk, default)
+        }
+        return MainActivityRuntime.prefs.getBoolean(baseKey, default)
+    }
+
     /** Scope-explicit int read for the Pad UI: the override at [serial]'s tier if
      *  present, else the global baseline (so a fresh per-game row shows the
      *  inherited value instead of blank). serial=null reads the global tier. */
@@ -123,6 +133,14 @@ object ControllerMappings {
         val key = scopedKey(baseKey, serial)
         if (MainActivityRuntime.prefs.contains(key)) return MainActivityRuntime.prefs.getInt(key, default)
         return MainActivityRuntime.prefs.getInt(baseKey, default)
+    }
+
+    /** Scope-explicit boolean read for the Pad UI: the override at [serial]'s tier if
+     *  present, else the global baseline. serial=null reads the global tier. */
+    private fun scopedBoolean(baseKey: String, serial: String?, default: Boolean): Boolean {
+        val key = scopedKey(baseKey, serial)
+        if (MainActivityRuntime.prefs.contains(key)) return MainActivityRuntime.prefs.getBoolean(key, default)
+        return MainActivityRuntime.prefs.getBoolean(baseKey, default)
     }
 
     private const val KEY_LSTICK = "pad.lstick.mode"
@@ -170,54 +188,44 @@ object ControllerMappings {
     // ---- Per-stick axis correction (invert / swap) ------------------------
     // Fixes pads whose stick reads rotated or mirrored — e.g. a right stick where
     // "down is up and left is right". Applied to the RAW axis values before any
-    // mode dispatch, so it corrects Analog, Face AND Custom modes alike. Per-stick
-    // but GLOBAL (a physical-pad correction, like sensitivity/deadzone above —
-    // not per-player). Swap is applied first, then the inverts.
+    // mode dispatch, so it corrects Analog, Face AND Custom modes alike. Swap is
+    // applied first, then the inverts. Follows the SAME Global/per-game scope as
+    // stick modes and binds (issue #246): the global value is the baseline, and a
+    // per-game override shadows it for that serial only — a user reported inverting
+    // one game's right stick flipped every game because these wrote global outright.
     private const val KEY_LSTICK_INVX = "pad.lstick.invertX"
     private const val KEY_LSTICK_INVY = "pad.lstick.invertY"
     private const val KEY_LSTICK_SWAP = "pad.lstick.swapXY"
     private const val KEY_RSTICK_INVX = "pad.rstick.invertX"
     private const val KEY_RSTICK_INVY = "pad.rstick.invertY"
     private const val KEY_RSTICK_SWAP = "pad.rstick.swapXY"
-    fun stickInvertX(left: Boolean): Boolean =
-        MainActivityRuntime.prefs.getBoolean(if (left) KEY_LSTICK_INVX else KEY_RSTICK_INVX, false)
-    fun stickInvertY(left: Boolean): Boolean =
-        MainActivityRuntime.prefs.getBoolean(if (left) KEY_LSTICK_INVY else KEY_RSTICK_INVY, false)
-    fun stickSwapXY(left: Boolean): Boolean =
-        MainActivityRuntime.prefs.getBoolean(if (left) KEY_LSTICK_SWAP else KEY_RSTICK_SWAP, false)
-    fun setStickInvertX(left: Boolean, on: Boolean) =
-        MainActivityRuntime.prefs.edit {
-            putBoolean(
-                if (left) KEY_LSTICK_INVX else KEY_RSTICK_INVX,
-                on
-            )
-        }
-    fun setStickInvertY(left: Boolean, on: Boolean) =
-        MainActivityRuntime.prefs.edit {
-            putBoolean(
-                if (left) KEY_LSTICK_INVY else KEY_RSTICK_INVY,
-                on
-            )
-        }
-    fun setStickSwapXY(left: Boolean, on: Boolean) =
-        MainActivityRuntime.prefs.edit {
-            putBoolean(
-                if (left) KEY_LSTICK_SWAP else KEY_RSTICK_SWAP,
-                on
-            )
-        }
+    private fun invXKey(left: Boolean) = if (left) KEY_LSTICK_INVX else KEY_RSTICK_INVX
+    private fun invYKey(left: Boolean) = if (left) KEY_LSTICK_INVY else KEY_RSTICK_INVY
+    private fun swapKey(left: Boolean) = if (left) KEY_LSTICK_SWAP else KEY_RSTICK_SWAP
+    // Runtime (per-game aware): read by the input dispatcher / touch overlay.
+    fun stickInvertX(left: Boolean): Boolean = resolveBoolean(invXKey(left), false)
+    fun stickInvertY(left: Boolean): Boolean = resolveBoolean(invYKey(left), false)
+    fun stickSwapXY(left: Boolean): Boolean = resolveBoolean(swapKey(left), false)
+    // Scope-explicit (Pad UI): the override at [serial]'s tier if set, else the global baseline.
+    fun stickInvertXScope(left: Boolean, serial: String?): Boolean = scopedBoolean(invXKey(left), serial, false)
+    fun stickInvertYScope(left: Boolean, serial: String?): Boolean = scopedBoolean(invYKey(left), serial, false)
+    fun stickSwapXYScope(left: Boolean, serial: String?): Boolean = scopedBoolean(swapKey(left), serial, false)
+    fun setStickInvertX(left: Boolean, on: Boolean, serial: String? = null) =
+        MainActivityRuntime.prefs.edit { putBoolean(scopedKey(invXKey(left), serial), on) }
+    fun setStickInvertY(left: Boolean, on: Boolean, serial: String? = null) =
+        MainActivityRuntime.prefs.edit { putBoolean(scopedKey(invYKey(left), serial), on) }
+    fun setStickSwapXY(left: Boolean, on: Boolean, serial: String? = null) =
+        MainActivityRuntime.prefs.edit { putBoolean(scopedKey(swapKey(left), serial), on) }
 
     // Make the physical D-pad drive the LEFT analog stick (full deflection) so it
     // works in games that only read the analog stick. While on, the D-pad no
-    // longer sends digital d-pad presses in-game.
+    // longer sends digital d-pad presses in-game. Same Global/per-game scope as the
+    // axis corrections above (it appears on the same per-game Pad screen).
     private const val KEY_DPAD_AS_LSTICK = "pad.dpadAsLeftStick"
-    fun dpadAsLeftStick(): Boolean = MainActivityRuntime.prefs.getBoolean(KEY_DPAD_AS_LSTICK, false)
-    fun setDpadAsLeftStick(on: Boolean) = MainActivityRuntime.prefs.edit {
-        putBoolean(
-            KEY_DPAD_AS_LSTICK,
-            on
-        )
-    }
+    fun dpadAsLeftStick(): Boolean = resolveBoolean(KEY_DPAD_AS_LSTICK, false) // runtime (per-game aware)
+    fun dpadAsLeftStickScope(serial: String?): Boolean = scopedBoolean(KEY_DPAD_AS_LSTICK, serial, false)
+    fun setDpadAsLeftStick(on: Boolean, serial: String? = null) =
+        MainActivityRuntime.prefs.edit { putBoolean(scopedKey(KEY_DPAD_AS_LSTICK, serial), on) }
 
     // ---- Analog stick response shaping (physical sticks → PS2 analog) ----
     // Sensitivity = a linear output scale. Acceleration = an exponential response
@@ -328,6 +336,58 @@ object ControllerMappings {
             }
         }
     }
+
+    // ---- Gyroscope / motion controls (per-game aware) ---------------------
+    // Drive a PS2 analog stick from the device's motion sensors: AIM (mode 1) reads the
+    // gyroscope's angular velocity onto the RIGHT stick (camera / look), STEERING
+    // (mode 2) reads the game-rotation-vector's roll onto the LEFT stick's X (tilt to
+    // steer). OFF (default) leaves the sensors untouched. Sensitivity / smoothing /
+    // invert tune the feel. These follow the SAME Global/per-game scope as the button
+    // binds (#246): a per-game override lives under "game.<serial>." and shadows the
+    // global value for that serial only. The sensor lifecycle in TouchControlsOverlay
+    // reads the runtime (per-game aware) getters while the game is running.
+    const val GYRO_OFF = 0
+    const val GYRO_AIM = 1
+    const val GYRO_STEER = 2
+    private const val KEY_GYRO_MODE = "pad.gyro.mode"
+    private const val KEY_GYRO_SENS = "pad.gyro.sensitivity"
+    private const val KEY_GYRO_SMOOTH = "pad.gyro.smoothing"
+    private const val KEY_GYRO_INVX = "pad.gyro.invertX"
+    private const val KEY_GYRO_INVY = "pad.gyro.invertY"
+    // Which analog stick Aim mode drives: 0 = Right (default, most FPS), 1 = Left
+    // (games that aim with the left stick, e.g. Resident Evil 4). No effect in Steer mode.
+    const val GYRO_STICK_RIGHT = 0
+    const val GYRO_STICK_LEFT = 1
+    private const val KEY_GYRO_AIM_STICK = "pad.gyro.aimStick"
+
+    // Runtime (per-game aware): read by the sensor lifecycle while a game runs.
+    fun gyroMode(): Int = resolveInt(KEY_GYRO_MODE, GYRO_OFF).coerceIn(0, 2)
+    fun gyroSensitivity(): Int = resolveInt(KEY_GYRO_SENS, 100).coerceIn(25, 300)
+    fun gyroSmoothing(): Int = resolveInt(KEY_GYRO_SMOOTH, 45).coerceIn(0, 90)
+    fun gyroInvertX(): Boolean = resolveBoolean(KEY_GYRO_INVX, false)
+    fun gyroInvertY(): Boolean = resolveBoolean(KEY_GYRO_INVY, false)
+    fun gyroAimStick(): Int = resolveInt(KEY_GYRO_AIM_STICK, GYRO_STICK_RIGHT).coerceIn(0, 1)
+
+    // Scope-explicit (Pad UI): read the global tier (serial=null) or a per-game tier.
+    fun gyroModeScope(serial: String?): Int = scopedInt(KEY_GYRO_MODE, serial, GYRO_OFF).coerceIn(0, 2)
+    fun gyroSensitivityScope(serial: String?): Int = scopedInt(KEY_GYRO_SENS, serial, 100).coerceIn(25, 300)
+    fun gyroSmoothingScope(serial: String?): Int = scopedInt(KEY_GYRO_SMOOTH, serial, 45).coerceIn(0, 90)
+    fun gyroInvertXScope(serial: String?): Boolean = scopedBoolean(KEY_GYRO_INVX, serial, false)
+    fun gyroInvertYScope(serial: String?): Boolean = scopedBoolean(KEY_GYRO_INVY, serial, false)
+    fun gyroAimStickScope(serial: String?): Int = scopedInt(KEY_GYRO_AIM_STICK, serial, GYRO_STICK_RIGHT).coerceIn(0, 1)
+
+    fun setGyroMode(value: Int, serial: String? = null) =
+        MainActivityRuntime.prefs.edit { putInt(scopedKey(KEY_GYRO_MODE, serial), value) }
+    fun setGyroSensitivity(value: Int, serial: String? = null) =
+        MainActivityRuntime.prefs.edit { putInt(scopedKey(KEY_GYRO_SENS, serial), value) }
+    fun setGyroSmoothing(value: Int, serial: String? = null) =
+        MainActivityRuntime.prefs.edit { putInt(scopedKey(KEY_GYRO_SMOOTH, serial), value) }
+    fun setGyroInvertX(on: Boolean, serial: String? = null) =
+        MainActivityRuntime.prefs.edit { putBoolean(scopedKey(KEY_GYRO_INVX, serial), on) }
+    fun setGyroInvertY(on: Boolean, serial: String? = null) =
+        MainActivityRuntime.prefs.edit { putBoolean(scopedKey(KEY_GYRO_INVY, serial), on) }
+    fun setGyroAimStick(value: Int, serial: String? = null) =
+        MainActivityRuntime.prefs.edit { putInt(scopedKey(KEY_GYRO_AIM_STICK, serial), value) }
 
     // ---- Custom per-direction stick→button binding (StickMode.CUSTOM) ----
 
@@ -603,6 +663,13 @@ object ControllerMappings {
         // MainActivityRuntime.dispatchKeyEvent (sets TouchControls.pressureModifierHeld), not as a
         // one-shot action like the others.
         PRESSURE_MOD("pad.pressuremod.keycode", "Pressure Modifier (hold)"),
+        // Gyro on/off (issue #337) — bind any spare button so gyro can be silenced
+        // mid-game without opening settings. TOGGLE flips it and stays; HOLD is the
+        // "only while aiming" binding (gyro live only while the button is held, so the
+        // phone can sit still the rest of the time). Both drive
+        // MainActivityRuntime.gyroActive and are session-only, never persisted.
+        GYRO_TOGGLE("pad.gyrotoggle.keycode", "Gyro On/Off (toggle)"),
+        GYRO_HOLD("pad.gyrohold.keycode", "Gyro (hold to aim)"),
     }
 
     // A hotkey is either a single button or a two-button combo. The main key is
@@ -690,6 +757,13 @@ object ControllerMappings {
     // any button — including B/A/Y/D-pad/L1/R1 the overlay nav would otherwise
     // consume (B = exit) — can be captured. Normal nav resumes when it clears.
     val padCapturing = mutableStateOf(false)
+
+    /** A pad-button capture in progress from the Controls screen (ControllerManagerScreen). While
+     *  set, MainActivityRuntime.dispatchKeyEvent binds the next pressed keycode via this lambda —
+     *  handled there, like [captureHotkey], instead of a focus-stealing AlertDialog whose separate
+     *  window swallowed controller keys before Compose's onPreviewKeyEvent could see them (the
+     *  2.6.0 "can't remap buttons" bug). The lambda binds the key and returns true. */
+    val capturePadAction = mutableStateOf<((Int) -> Boolean)?>(null)
 
     // Capture bridge: the Hotkeys tab calls [beginHotkeyCapture]; the next
     // button(s) seen by MainActivityRuntime.dispatchKeyEvent are bound to it. Press one button

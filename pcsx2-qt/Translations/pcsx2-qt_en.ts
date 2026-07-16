@@ -5183,7 +5183,7 @@ Do you want to overwrite?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Docking/DockTables.cpp" line="90"/>
+        <location filename="../Debugger/Docking/DockTables.cpp" line="91"/>
         <source>R3000</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5275,13 +5275,13 @@ Do you want to overwrite?</source>
     </message>
     <message>
         <location filename="../Debugger/DebuggerWindow.ui" line="32"/>
-        <location filename="../Debugger/DebuggerWindow.ui" line="105"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="121"/>
         <source>File</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../Debugger/DebuggerWindow.ui" line="42"/>
-        <location filename="../Debugger/DebuggerWindow.ui" line="87"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="103"/>
         <source>Debug</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5292,134 +5292,160 @@ Do you want to overwrite?</source>
     </message>
     <message>
         <location filename="../Debugger/DebuggerWindow.ui" line="57"/>
-        <location filename="../Debugger/DebuggerWindow.ui" line="138"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="154"/>
         <source>View</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="67"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="70"/>
         <source>Layouts</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="74"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="77"/>
         <source>Tools</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="122"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="90"/>
+        <source>Navigation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../Debugger/DebuggerWindow.ui" line="138"/>
         <source>System</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="159"/>
-        <location filename="../Debugger/DebuggerWindow.cpp" line="326"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="175"/>
+        <location filename="../Debugger/DebuggerWindow.cpp" line="363"/>
         <source>Run</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="167"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="183"/>
         <source>Step Into</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="170"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="186"/>
         <source>F11</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="178"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="194"/>
         <source>Step Over</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="181"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="197"/>
         <source>F10</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="189"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="205"/>
         <source>Step Out</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="192"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="208"/>
         <source>Shift+F11</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="203"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="219"/>
         <source>Always On Top</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="206"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="222"/>
         <source>Show this window on top</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="214"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="230"/>
         <source>Analyze</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="219"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="235"/>
         <source>Reset All Layouts</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="224"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="240"/>
         <source>Reset Default Layouts</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="229"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="245"/>
         <source>Reset Splitter Positions</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="237"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="253"/>
         <source>Shut Down</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="248"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="264"/>
         <source>Reset</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="259"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="275"/>
         <source>Close</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="270"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="286"/>
         <source>Increase Font Size</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="281"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="297"/>
         <source>Decrease Font Size</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="284"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="300"/>
         <source>Ctrl+-</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="295"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="311"/>
         <source>Reset Font Size</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="306"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="322"/>
         <source>Settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.ui" line="317"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="333"/>
         <source>Game Settings</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../Debugger/DebuggerWindow.ui" line="354"/>
+        <location filename="../Debugger/DebuggerWindow.ui" line="357"/>
+        <source>Navigate Back</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../Debugger/DebuggerWindow.ui" line="360"/>
+        <source>Alt+Left</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../Debugger/DebuggerWindow.ui" line="371"/>
+        <source>Navigate Forward</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../Debugger/DebuggerWindow.ui" line="374"/>
+        <source>Alt+Right</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -5439,7 +5465,7 @@ Do you want to overwrite?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DebuggerWindow.cpp" line="366"/>
+        <location filename="../Debugger/DebuggerWindow.cpp" line="403"/>
         <source>Pause</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5452,168 +5478,168 @@ Do you want to overwrite?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="113"/>
-        <location filename="../Debugger/DisassemblyView.cpp" line="132"/>
-        <location filename="../Debugger/DisassemblyView.cpp" line="150"/>
-        <location filename="../Debugger/DisassemblyView.cpp" line="166"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="117"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="136"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="154"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="170"/>
         <source>Assemble Error</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="113"/>
-        <location filename="../Debugger/DisassemblyView.cpp" line="150"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="117"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="154"/>
         <source>Unable to change assembly while core is running</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="157"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="161"/>
         <source>Assemble Instruction</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="250"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="254"/>
         <source>Go To In Disassembly</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="257"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="261"/>
         <source>Cannot Go To</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="307"/>
-        <location filename="../Debugger/DisassemblyView.cpp" line="318"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="311"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="322"/>
         <source>Rename Function Error</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="307"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="311"/>
         <source>No function / symbol is currently selected.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="311"/>
-        <location filename="../Debugger/DisassemblyView.cpp" line="800"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="315"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="847"/>
         <source>Rename Function</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="312"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="316"/>
         <source>Function name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="318"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="322"/>
         <source>Function name cannot be nothing.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="374"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="378"/>
         <source>Restore Function Error</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="374"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="378"/>
         <source>Unable to stub selected address.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="727"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="774"/>
         <source>Copy Address</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="730"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="777"/>
         <source>Copy Instruction Hex</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="733"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="780"/>
         <source>&amp;Copy Instruction Text</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="739"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="786"/>
         <source>Copy Function Name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="743"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="790"/>
         <source>Paste Instruction Text</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="750"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="797"/>
         <source>Restore Instruction(s)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="754"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="801"/>
         <source>Asse&amp;mble new Instruction(s)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="758"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="805"/>
         <source>NOP Instruction(s)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="763"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="810"/>
         <source>Run to Cursor</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="766"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="813"/>
         <source>&amp;Jump to Cursor</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="770"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="817"/>
         <source>Toggle &amp;Breakpoint</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="774"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="821"/>
         <source>Follow Branch</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="779"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="826"/>
         <source>&amp;Go to Address</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="789"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="836"/>
         <source>Go to PC on Pause</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="797"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="844"/>
         <source>Add Function</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="803"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="850"/>
         <source>Remove Function</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="809"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="856"/>
         <source>Restore Function</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="814"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="861"/>
         <source>Stub (NOP) Function</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="820"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="867"/>
         <source>Show &amp;Instruction Bytes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="879"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="926"/>
         <source>%1 NOT VALID ADDRESS</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5621,27 +5647,27 @@ Do you want to overwrite?</source>
 <context>
     <name>DisassemblyViewColumnTitle</name>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="838"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="885"/>
         <source> %1 %2 %3  %4</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="842"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="889"/>
         <source> %1 %2  %3</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="850"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="897"/>
         <source>Location</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="855"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="902"/>
         <source>Bytes   </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/DisassemblyView.cpp" line="859"/>
+        <location filename="../Debugger/DisassemblyView.cpp" line="906"/>
         <source>Instruction</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5667,38 +5693,38 @@ Do you want to overwrite?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Docking/DockManager.cpp" line="366"/>
+        <location filename="../Debugger/Docking/DockManager.cpp" line="379"/>
         <source>Add Another...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Docking/DockManager.cpp" line="586"/>
+        <location filename="../Debugger/Docking/DockManager.cpp" line="599"/>
         <source>Edit Layout</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Docking/DockManager.cpp" line="591"/>
+        <location filename="../Debugger/Docking/DockManager.cpp" line="604"/>
         <source>Reset Layout</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Docking/DockManager.cpp" line="649"/>
+        <location filename="../Debugger/Docking/DockManager.cpp" line="662"/>
         <source>Are you sure you want to reset layout &apos;%1&apos;?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Docking/DockManager.cpp" line="648"/>
-        <location filename="../Debugger/Docking/DockManager.cpp" line="679"/>
+        <location filename="../Debugger/Docking/DockManager.cpp" line="661"/>
+        <location filename="../Debugger/Docking/DockManager.cpp" line="692"/>
         <source>Confirmation</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Docking/DockManager.cpp" line="597"/>
+        <location filename="../Debugger/Docking/DockManager.cpp" line="610"/>
         <source>Delete Layout</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Docking/DockManager.cpp" line="680"/>
+        <location filename="../Debugger/Docking/DockManager.cpp" line="693"/>
         <source>Are you sure you want to delete layout &apos;%1&apos;?</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5724,57 +5750,57 @@ Do you want to overwrite?</source>
 <context>
     <name>DockTabBar</name>
     <message>
-        <location filename="../Debugger/Docking/DockViews.cpp" line="169"/>
+        <location filename="../Debugger/Docking/DockViews.cpp" line="176"/>
         <source>Rename</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Docking/DockViews.cpp" line="178"/>
+        <location filename="../Debugger/Docking/DockViews.cpp" line="185"/>
         <source>Rename Window</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Docking/DockViews.cpp" line="179"/>
+        <location filename="../Debugger/Docking/DockViews.cpp" line="186"/>
         <source>New name:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Docking/DockViews.cpp" line="188"/>
+        <location filename="../Debugger/Docking/DockViews.cpp" line="195"/>
         <source>Invalid Name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Docking/DockViews.cpp" line="188"/>
+        <location filename="../Debugger/Docking/DockViews.cpp" line="195"/>
         <source>The specified name is too long.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Docking/DockViews.cpp" line="196"/>
+        <location filename="../Debugger/Docking/DockViews.cpp" line="203"/>
         <source>Reset Name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Docking/DockViews.cpp" line="210"/>
+        <location filename="../Debugger/Docking/DockViews.cpp" line="217"/>
         <source>Primary</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Docking/DockViews.cpp" line="225"/>
+        <location filename="../Debugger/Docking/DockViews.cpp" line="232"/>
         <source>Set Target</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Docking/DockViews.cpp" line="233"/>
+        <location filename="../Debugger/Docking/DockViews.cpp" line="240"/>
         <source>%1 (%2)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Docking/DockViews.cpp" line="246"/>
+        <location filename="../Debugger/Docking/DockViews.cpp" line="253"/>
         <source>Inherit From Layout</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Docking/DockViews.cpp" line="254"/>
+        <location filename="../Debugger/Docking/DockViews.cpp" line="261"/>
         <source>Close</source>
         <translation type="unfinished"></translation>
     </message>
@@ -6419,42 +6445,42 @@ Do you want to overwrite?</source>
 <context>
     <name>FileOperations</name>
     <message>
-        <location filename="../QtUtils.cpp" line="280"/>
+        <location filename="../QtUtils.cpp" line="297"/>
         <source>Failed to show file</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../QtUtils.cpp" line="281"/>
+        <location filename="../QtUtils.cpp" line="298"/>
         <source>Failed to show file in file explorer.
 
 The file was: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../QtUtils.cpp" line="289"/>
+        <location filename="../QtUtils.cpp" line="306"/>
         <source>Show in Explorer</source>
         <extracomment>Windows action to show a file in Windows Explorer</extracomment>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../QtUtils.cpp" line="292"/>
+        <location filename="../QtUtils.cpp" line="309"/>
         <source>Show in Finder</source>
         <extracomment>macOS action to show a file in Finder</extracomment>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../QtUtils.cpp" line="295"/>
+        <location filename="../QtUtils.cpp" line="312"/>
         <source>Open Containing Directory</source>
         <extracomment>Linux/*NIX: Opens the system file manager to the directory containing a selected file</extracomment>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../QtUtils.cpp" line="303"/>
+        <location filename="../QtUtils.cpp" line="320"/>
         <source>Failed to open URL</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../QtUtils.cpp" line="304"/>
+        <location filename="../QtUtils.cpp" line="321"/>
         <source>Failed to open URL.
 
 The URL was: %1</source>
@@ -12432,7 +12458,7 @@ This action cannot be undone.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp" line="5306"/>
+        <location filename="../../pcsx2/GS/Renderers/Vulkan/GSDeviceVK.cpp" line="5305"/>
         <source>Spin GPU During Readbacks is enabled, but calibrated timestamps are unavailable.  This might be really slow.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -18380,21 +18406,6 @@ Right click to clear binding</source>
 <context>
     <name>LayoutEditorDialog</name>
     <message>
-        <location filename="../Debugger/Docking/LayoutEditorDialog.ui" line="22"/>
-        <source>Name</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../Debugger/Docking/LayoutEditorDialog.ui" line="32"/>
-        <source>Target</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../Debugger/Docking/LayoutEditorDialog.ui" line="42"/>
-        <source>Initial State</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../Debugger/Docking/LayoutEditorDialog.cpp" line="18"/>
         <source>New Layout</source>
         <translation type="unfinished"></translation>
@@ -18437,6 +18448,21 @@ Right click to clear binding</source>
     <message>
         <location filename="../Debugger/Docking/LayoutEditorDialog.cpp" line="102"/>
         <source>A layout with that name already exists.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../Debugger/Docking/LayoutEditorDialog.ui" line="28"/>
+        <source>Name:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../Debugger/Docking/LayoutEditorDialog.ui" line="38"/>
+        <source>Target:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../Debugger/Docking/LayoutEditorDialog.ui" line="48"/>
+        <source>Initial State:</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -20650,77 +20676,77 @@ Slot 2: {}</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="778"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="824"/>
         <source>Copy Address</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="789"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="835"/>
         <source>Go to Address</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="792"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="838"/>
         <source>Follow Address</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="797"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="843"/>
         <source>Show as Little Endian</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="810"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="856"/>
         <source>Show as 1 byte</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="816"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="862"/>
         <source>Show as 2 bytes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="822"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="868"/>
         <source>Show as 4 bytes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="828"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="874"/>
         <source>Show as 8 bytes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="834"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="880"/>
         <source>Show as float</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="848"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="894"/>
         <source>Copy Byte</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="852"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="898"/>
         <source>Copy Segment</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="854"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="900"/>
         <source>Copy Character</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="858"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="904"/>
         <source>Paste</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="898"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="944"/>
         <source>Go To In Memory View</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="905"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="951"/>
         <source>Cannot Go To</source>
         <translation type="unfinished"></translation>
     </message>
@@ -20728,19 +20754,19 @@ Slot 2: {}</source>
 <context>
     <name>MemoryViewTable</name>
     <message>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="307"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="316"/>
         <source>Input New Float</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="315"/>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="352"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="324"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="361"/>
         <source>Input Error</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="315"/>
-        <location filename="../Debugger/Memory/MemoryView.cpp" line="352"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="324"/>
+        <location filename="../Debugger/Memory/MemoryView.cpp" line="361"/>
         <source>Invalid float value</source>
         <translation type="unfinished"></translation>
     </message>
@@ -23225,233 +23251,243 @@ Do you want to continue?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="69"/>
+        <location filename="../SetupWizardDialog.ui" line="68"/>
         <source>Language</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="76"/>
+        <location filename="../SetupWizardDialog.ui" line="75"/>
         <source>BIOS Image</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="83"/>
+        <location filename="../SetupWizardDialog.ui" line="82"/>
         <source>Game Directories</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="90"/>
+        <location filename="../SetupWizardDialog.ui" line="89"/>
         <source>Controller Setup</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="97"/>
-        <location filename="../SetupWizardDialog.ui" line="700"/>
+        <location filename="../SetupWizardDialog.ui" line="96"/>
+        <location filename="../SetupWizardDialog.ui" line="705"/>
         <source>RetroAchievements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="104"/>
+        <location filename="../SetupWizardDialog.ui" line="103"/>
         <source>Complete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="171"/>
+        <location filename="../SetupWizardDialog.ui" line="170"/>
         <source>Language:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="191"/>
+        <location filename="../SetupWizardDialog.ui" line="190"/>
         <source>Theme:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="217"/>
+        <location filename="../SetupWizardDialog.ui" line="216"/>
         <source>Enable Automatic Updates</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="242"/>
+        <location filename="../SetupWizardDialog.ui" line="241"/>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;PCSX2 requires a PS2 BIOS in order to run.&lt;/p&gt;&lt;p&gt;For legal reasons, you must obtain a BIOS &lt;strong&gt;from an actual PS2 unit that you own&lt;/strong&gt; (borrowing doesn&apos;t count).&lt;/p&gt;&lt;p&gt;Once dumped, this BIOS image should be placed in the bios folder within the data directory shown below, or you can instruct PCSX2 to scan an alternative directory.&lt;/p&gt;&lt;p&gt;A guide for dumping your BIOS can be found &lt;a href=&quot;https://pcsx2.net/docs/setup/bios/&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="263"/>
+        <location filename="../SetupWizardDialog.ui" line="262"/>
         <source>BIOS Directory:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="276"/>
+        <location filename="../SetupWizardDialog.ui" line="275"/>
         <source>Browse...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="283"/>
+        <location filename="../SetupWizardDialog.ui" line="282"/>
         <source>Reset</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="302"/>
+        <location filename="../SetupWizardDialog.ui" line="301"/>
         <source>Filename</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="307"/>
+        <location filename="../SetupWizardDialog.ui" line="306"/>
         <source>Version</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="330"/>
+        <location filename="../SetupWizardDialog.ui" line="329"/>
         <source>Open BIOS Folder...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="337"/>
+        <location filename="../SetupWizardDialog.ui" line="336"/>
         <source>Refresh List</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="362"/>
+        <location filename="../SetupWizardDialog.ui" line="361"/>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;PCSX2 will automatically scan and identify games from the selected directories below, and populate the game list.&lt;br&gt;These games should be dumped from discs you own. Guides for dumping discs can be found &lt;a href=&quot;https://pcsx2.net/docs/setup/dumping&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;&lt;p&gt;Supported formats for dumps include:&lt;/p&gt;&lt;p&gt;&lt;ul&gt;&lt;li&gt;.bin/.iso (ISO Disc Images)&lt;/li&gt;&lt;li&gt;.mdf (Media Descriptor File)&lt;/li&gt;&lt;li&gt;.chd (Compressed Hunks of Data)&lt;/li&gt;&lt;li&gt;.cso (Compressed ISO)&lt;/li&gt;&lt;li&gt;.zso (Compressed ISO)&lt;/li&gt;&lt;li&gt;.gz (Gzip Compressed ISO)&lt;/li&gt;&lt;/ul&gt;&lt;/p&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="383"/>
+        <location filename="../SetupWizardDialog.ui" line="382"/>
         <source>Search Directories (will be scanned for games)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="412"/>
+        <location filename="../SetupWizardDialog.ui" line="411"/>
         <source>Add...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="431"/>
-        <location filename="../SetupWizardDialog.cpp" line="272"/>
+        <location filename="../SetupWizardDialog.ui" line="430"/>
+        <location filename="../SetupWizardDialog.cpp" line="278"/>
         <source>Remove</source>
         <extracomment>Part of the right-click menu for game directory entries</extracomment>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="447"/>
+        <location filename="../SetupWizardDialog.ui" line="446"/>
         <source>Search Directory</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="452"/>
+        <location filename="../SetupWizardDialog.ui" line="451"/>
         <source>Scan Recursively</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="722"/>
+        <location filename="../SetupWizardDialog.ui" line="727"/>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;justify&quot;&gt;PCSX2 supports RetroAchievements, a service that adds achievements, leaderboards, and extra challenges to classic games.&lt;/p&gt;&lt;p align=&quot;justify&quot;&gt;Sign in below to link your account and start earning achievements in supported titles, or create a free account at &lt;a href=&quot;https://retroachievements.org/createaccount.php&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#27bf73;&quot;&gt;retroachievements.org/createaccount.php&lt;/span&gt;&lt;/a&gt;.&lt;/p&gt;&lt;p align=&quot;justify&quot;&gt;Using RetroAchievements is completely optional and not required to use PCSX2.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="747"/>
+        <location filename="../SetupWizardDialog.ui" line="755"/>
         <source>RAIntegration is being used, built-in RetroAchievements support is disabled.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="781"/>
+        <location filename="../SetupWizardDialog.ui" line="789"/>
         <source>Enable Achievements</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="788"/>
+        <location filename="../SetupWizardDialog.ui" line="796"/>
         <source>Enable Hardcore Mode</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="811"/>
+        <location filename="../SetupWizardDialog.ui" line="819"/>
         <source>Account</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="817"/>
-        <location filename="../SetupWizardDialog.cpp" line="455"/>
+        <location filename="../SetupWizardDialog.ui" line="825"/>
+        <location filename="../SetupWizardDialog.cpp" line="477"/>
         <source>Not Logged In.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="846"/>
+        <location filename="../SetupWizardDialog.ui" line="854"/>
         <source>View Profile...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="853"/>
-        <location filename="../SetupWizardDialog.cpp" line="456"/>
+        <location filename="../SetupWizardDialog.ui" line="861"/>
+        <location filename="../SetupWizardDialog.cpp" line="478"/>
         <source>Login...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="863"/>
+        <location filename="../SetupWizardDialog.ui" line="871"/>
         <source>You can customize additional RetroAchievements options later in Settings &gt; Achievements.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="905"/>
+        <location filename="../SetupWizardDialog.ui" line="913"/>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;h1 style=&quot; margin-top:18px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-size:xx-large; font-weight:700;&quot;&gt;Setup Complete!&lt;/span&gt;&lt;/h1&gt;&lt;p&gt;You are now ready to run games.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Warning: Do not run untrusted programs in PCSX2. It is not a sandbox and cannot protect your computer from malicious software.&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Further options are available under the settings menu. You can also use the Big Picture UI for navigation entirely with a gamepad.&lt;/p&gt;&lt;p&gt;We hope you enjoy using PCSX2.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="150"/>
+        <location filename="../SetupWizardDialog.ui" line="149"/>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;h1 style=&quot; margin-top:18px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-size:xx-large; font-weight:700;&quot;&gt;Welcome to PCSX2!&lt;/span&gt;&lt;/h1&gt;&lt;p&gt;This wizard will help guide you through the configuration steps required to use the application. It is recommended if this is your first time installing PCSX2 that you view the setup guide &lt;a href=&quot;https://pcsx2.net/docs/&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;&lt;p&gt;By default, PCSX2 will connect to the server at &lt;a href=&quot;https://pcsx2.net/&quot;&gt;pcsx2.net&lt;/a&gt; to check for updates, and if available and confirmed, download update packages from &lt;a href=&quot;https://github.com/&quot;&gt;github.com&lt;/a&gt;. If you do not wish for PCSX2 to make any network connections on startup, you should uncheck the Automatic Updates option now. The Automatic Update setting can be changed later at any time in Interface Settings.&lt;/p&gt;&lt;p&gt;Please choose a language and theme to begin.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="479"/>
+        <location filename="../SetupWizardDialog.ui" line="478"/>
         <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;By default, PCSX2 will map your keyboard to the virtual PS2 controller.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:704;&quot;&gt;To use an external controller, you must map it first. &lt;/span&gt;On this screen, you can automatically map any controller which is currently connected. If your controller is not currently connected, you can plug it in now.&lt;/p&gt;&lt;p&gt;To change controller bindings in more detail, or use multi-tap, open the Settings menu and choose Controllers once you have completed the Setup Wizard.&lt;/p&gt;&lt;p&gt;Guides for configuring controllers can be found &lt;a href=&quot;https://pcsx2.net/docs/post/controllers/&quot;&gt;&lt;span style=&quot;&quot;&gt;here&lt;/span&gt;&lt;/a&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="492"/>
+        <location filename="../SetupWizardDialog.ui" line="491"/>
         <source>Controller Port 1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="501"/>
-        <location filename="../SetupWizardDialog.ui" line="578"/>
+        <location filename="../SetupWizardDialog.ui" line="500"/>
+        <location filename="../SetupWizardDialog.ui" line="580"/>
         <source>Controller Mapped To:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="508"/>
-        <location filename="../SetupWizardDialog.ui" line="565"/>
+        <location filename="../SetupWizardDialog.ui" line="507"/>
+        <location filename="../SetupWizardDialog.ui" line="567"/>
         <source>Controller Type:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="520"/>
-        <location filename="../SetupWizardDialog.ui" line="587"/>
-        <location filename="../SetupWizardDialog.cpp" line="404"/>
+        <location filename="../SetupWizardDialog.ui" line="519"/>
+        <location filename="../SetupWizardDialog.ui" line="589"/>
+        <location filename="../SetupWizardDialog.cpp" line="410"/>
         <source>Default (Keyboard)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="540"/>
-        <location filename="../SetupWizardDialog.ui" line="607"/>
+        <location filename="../SetupWizardDialog.ui" line="542"/>
+        <location filename="../SetupWizardDialog.ui" line="612"/>
         <source>Automatic Mapping</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="559"/>
+        <location filename="../SetupWizardDialog.ui" line="561"/>
         <source>Controller Port 2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="940"/>
+        <location filename="../SetupWizardDialog.ui" line="926"/>
+        <source>Create Desktop shortcut</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../SetupWizardDialog.ui" line="933"/>
+        <source>Add PCSX2 to the Application Menu</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../SetupWizardDialog.ui" line="962"/>
         <source>&amp;Back</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="947"/>
-        <location filename="../SetupWizardDialog.cpp" line="140"/>
+        <location filename="../SetupWizardDialog.ui" line="969"/>
+        <location filename="../SetupWizardDialog.cpp" line="145"/>
         <source>&amp;Next</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.ui" line="957"/>
+        <location filename="../SetupWizardDialog.ui" line="979"/>
         <source>&amp;Cancel</source>
         <translation type="unfinished"></translation>
     </message>
@@ -23474,73 +23510,78 @@ Are you sure you want to continue?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.cpp" line="140"/>
+        <location filename="../SetupWizardDialog.cpp" line="145"/>
         <source>&amp;Finish</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.cpp" line="146"/>
+        <location filename="../SetupWizardDialog.cpp" line="151"/>
         <source>Cancel Setup</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.cpp" line="147"/>
+        <location filename="../SetupWizardDialog.cpp" line="152"/>
         <source>Are you sure you want to cancel PCSX2 setup?
 
 Any changes have been saved, and the wizard will run again next time you start PCSX2.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.cpp" line="275"/>
+        <location filename="../SetupWizardDialog.cpp" line="281"/>
         <source>Open Directory...</source>
         <extracomment>Part of the right-click menu for game directory entries</extracomment>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.cpp" line="287"/>
+        <location filename="../SetupWizardDialog.cpp" line="293"/>
         <source>Select Search Directory</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.cpp" line="292"/>
+        <location filename="../SetupWizardDialog.cpp" line="298"/>
         <source>Scan Recursively?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.cpp" line="293"/>
+        <location filename="../SetupWizardDialog.cpp" line="299"/>
         <source>Would you like to scan the directory &quot;%1&quot; recursively?
 
 Scanning recursively takes more time, but will identify files in subdirectories.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.cpp" line="404"/>
+        <location filename="../SetupWizardDialog.cpp" line="410"/>
         <source>Default (None)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../SetupWizardDialog.cpp" line="448"/>
+        <source>Add PCSX2 to the Start Menu</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../SetupWizardDialog.cpp" line="470"/>
         <source>Username: %1
 Login token generated on %2.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.cpp" line="451"/>
+        <location filename="../SetupWizardDialog.cpp" line="473"/>
         <source>Logout</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.cpp" line="520"/>
+        <location filename="../SetupWizardDialog.cpp" line="542"/>
         <source>No devices available</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.cpp" line="533"/>
+        <location filename="../SetupWizardDialog.cpp" line="555"/>
         <source>Automatic Binding</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../SetupWizardDialog.cpp" line="534"/>
+        <location filename="../SetupWizardDialog.cpp" line="556"/>
         <source>No generic bindings were generated for device &apos;%1&apos;. The controller/source may not support automatic mapping.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -23695,190 +23736,63 @@ Login token generated on %2.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="29"/>
+        <location filename="../ShortcutCreationDialog.cpp" line="20"/>
         <source>Create Shortcut For %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="33"/>
+        <location filename="../ShortcutCreationDialog.cpp" line="24"/>
         <source>Start Menu</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="35"/>
+        <location filename="../ShortcutCreationDialog.cpp" line="26"/>
         <source>Application Launcher</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="45"/>
+        <location filename="../ShortcutCreationDialog.cpp" line="36"/>
         <source>Select ELF File</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="45"/>
+        <location filename="../ShortcutCreationDialog.cpp" line="36"/>
         <source>ELF Files (*.elf);;All Files (*.*)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="51"/>
+        <location filename="../ShortcutCreationDialog.cpp" line="42"/>
         <source>Select Save State File</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="51"/>
+        <location filename="../ShortcutCreationDialog.cpp" line="42"/>
         <source>Save States (*.p2s);;All Files (*.*)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="77"/>
+        <location filename="../ShortcutCreationDialog.cpp" line="68"/>
         <source>Icon Files (*.ico);;All Files (*.*)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="79"/>
+        <location filename="../ShortcutCreationDialog.cpp" line="70"/>
         <source>Image Files (*.png *.jpg *.svg *.webp);;All Files (*.*)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="81"/>
+        <location filename="../ShortcutCreationDialog.cpp" line="72"/>
         <source>Select Icon</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="87"/>
+        <location filename="../ShortcutCreationDialog.cpp" line="78"/>
         <source>Invalid Icon</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="87"/>
+        <location filename="../ShortcutCreationDialog.cpp" line="78"/>
         <source>The selected file could not be loaded as an icon.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="185"/>
-        <location filename="../ShortcutCreationDialog.cpp" line="205"/>
-        <location filename="../ShortcutCreationDialog.cpp" line="214"/>
-        <location filename="../ShortcutCreationDialog.cpp" line="221"/>
-        <location filename="../ShortcutCreationDialog.cpp" line="232"/>
-        <location filename="../ShortcutCreationDialog.cpp" line="254"/>
-        <location filename="../ShortcutCreationDialog.cpp" line="262"/>
-        <location filename="../ShortcutCreationDialog.cpp" line="311"/>
-        <location filename="../ShortcutCreationDialog.cpp" line="349"/>
-        <location filename="../ShortcutCreationDialog.cpp" line="360"/>
-        <location filename="../ShortcutCreationDialog.cpp" line="368"/>
-        <location filename="../ShortcutCreationDialog.cpp" line="396"/>
-        <location filename="../ShortcutCreationDialog.cpp" line="405"/>
-        <location filename="../ShortcutCreationDialog.cpp" line="441"/>
-        <location filename="../ShortcutCreationDialog.cpp" line="483"/>
-        <source>Failed to create shortcut</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="185"/>
-        <location filename="../ShortcutCreationDialog.cpp" line="360"/>
-        <source>Filename contains illegal character.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="205"/>
-        <source>Could not create start menu directory.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="214"/>
-        <source>&apos;Desktop&apos; directory not found</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="214"/>
-        <source>User&apos;s &apos;Start Menu\Programs&apos; directory not found</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="221"/>
-        <source>A shortcut with the same name already exists.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="232"/>
-        <location filename="../ShortcutCreationDialog.cpp" line="441"/>
-        <source>File path contains invalid character(s).</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="254"/>
-        <source>CoInitialize failed (%1)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="270"/>
-        <source>CoCreateInstance failed</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="279"/>
-        <source>SetPath failed (%1)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="288"/>
-        <source>SetWorkingDirectory failed (%1)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="299"/>
-        <source>SetArguments failed (%1)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="311"/>
-        <location filename="../ShortcutCreationDialog.cpp" line="405"/>
-        <source>The selected icon file does not exist.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="324"/>
-        <source>SetIconLocation failed (%1)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="332"/>
-        <source>QueryInterface failed (%1)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="341"/>
-        <source>Failed to save the shortcut (%1)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="349"/>
-        <source>Cannot create a shortcut without a title.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="368"/>
-        <source>Executable path is empty.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="396"/>
-        <source>Path to the Home directory is empty.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="473"/>
-        <source>Desktop Shortcut Files (*.desktop)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="475"/>
-        <source>Select Shortcut Save Destination</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../ShortcutCreationDialog.cpp" line="483"/>
-        <source>Failed to create .desktop file</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -24464,12 +24378,12 @@ Rename it to {} to remove this warning.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="440"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="442"/>
         <source>GunCon 2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="582"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="584"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="78"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="106"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="938"/>
@@ -24483,7 +24397,7 @@ Rename it to {} to remove this warning.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="583"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="585"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="79"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="107"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="940"/>
@@ -24497,7 +24411,7 @@ Rename it to {} to remove this warning.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="584"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="586"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="80"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="108"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="941"/>
@@ -24511,7 +24425,7 @@ Rename it to {} to remove this warning.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="585"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="587"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="81"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="109"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="939"/>
@@ -24525,22 +24439,22 @@ Rename it to {} to remove this warning.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="587"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="589"/>
         <source>Trigger</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="588"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="590"/>
         <source>Shoot Offscreen</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="590"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="592"/>
         <source>Calibration Shot</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="592"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="594"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="139"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-seamic.cpp" line="363"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-train.cpp" line="154"/>
@@ -24548,7 +24462,7 @@ Rename it to {} to remove this warning.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="593"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="595"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="140"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-seamic.cpp" line="364"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-train.cpp" line="155"/>
@@ -24556,14 +24470,14 @@ Rename it to {} to remove this warning.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="594"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="596"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-seamic.cpp" line="365"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-train.cpp" line="156"/>
         <source>C</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="595"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="597"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="90"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="116"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="936"/>
@@ -24577,7 +24491,7 @@ Rename it to {} to remove this warning.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="596"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="598"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="91"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="117"/>
         <location filename="../../pcsx2/USB/usb-pad/usb-pad.cpp" line="937"/>
@@ -24591,141 +24505,141 @@ Rename it to {} to remove this warning.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="597"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="599"/>
         <source>Relative Left</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="598"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="600"/>
         <source>Relative Right</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="599"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="601"/>
         <source>Relative Up</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="600"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="602"/>
         <source>Relative Down</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="609"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="611"/>
         <source>Cursor Path</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="610"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="612"/>
         <source>Sets the crosshair image that this lightgun will use. Setting a crosshair image will disable the system cursor.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="613"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="615"/>
         <source>Cursor Scale</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="614"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="616"/>
         <source>Scales the crosshair image set above.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="614"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="616"/>
         <source>%.0f%%</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="616"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="618"/>
         <source>Cursor Color</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="617"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="619"/>
         <source>Applies a color to the chosen crosshair images, can be used for multiple players. Specify in HTML/CSS format (e.g. #aabbcc)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="620"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="622"/>
         <source>Manual Screen Configuration</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="621"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="623"/>
         <source>Forces the use of the screen parameters below, instead of automatic parameters if available.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="624"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="626"/>
         <source>X Scale (Sensitivity)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="625"/>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="628"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="627"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="630"/>
         <source>Scales the position to simulate CRT curvature.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="626"/>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="629"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="628"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="631"/>
         <source>%.2f%%</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="627"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="629"/>
         <source>Y Scale (Sensitivity)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="630"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="632"/>
         <source>Center X</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="631"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="633"/>
         <source>Sets the horizontal center position of the simulated screen.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="632"/>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="635"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="634"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="637"/>
         <source>%.0fpx</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="633"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="635"/>
         <source>Center Y</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="634"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="636"/>
         <source>Sets the vertical center position of the simulated screen.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="636"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="638"/>
         <source>Screen Width</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="637"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="639"/>
         <source>Sets the width of the simulated screen.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="637"/>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="640"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="639"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="642"/>
         <source>%dpx</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="639"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="641"/>
         <source>Screen Height</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="640"/>
+        <location filename="../../pcsx2/USB/usb-lightgun/guncon2.cpp" line="642"/>
         <source>Sets the height of the simulated screen.</source>
         <translation type="unfinished"></translation>
     </message>

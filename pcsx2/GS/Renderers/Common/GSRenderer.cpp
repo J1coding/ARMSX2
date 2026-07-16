@@ -260,6 +260,11 @@ bool GSRenderer::Merge(int field)
 	if (GSConfig.FXAA)
 		g_gs_device->FXAA();
 
+	// RetroArch (.slangp) shader chain runs last in the post-process chain, so it sees
+	// the finished frame the way the user actually sees it (ShadeBoost/FXAA included).
+	// Self-guards on GSConfig.ShaderChainEnabled and no-ops on backends without one.
+	g_gs_device->ApplyShaderChain();
+
 	// Sharpens biinear at lower resolutions, almost nearest but with more uniform pixels.
 	if (GSConfig.LinearPresent == GSPostBilinearMode::BilinearSharp && (g_gs_device->GetWindowWidth() > fs.x || g_gs_device->GetWindowHeight() > fs.y))
 	{
@@ -690,7 +695,7 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 				else if (!mfx_log_once)
 				{
 					Host::AddIconOSDMessage("MetalFXUnsupported", ICON_FA_TRIANGLE_EXCLAMATION,
-						TRANSLATE_SV("GS", "MetalFX upscaling is not available on this system (requires macOS 13, iOS 16, or newer with a supported Metal GPU)."),
+						TRANSLATE_SV("GS", "MetalFX upscaling is not available on this system (requires a Metal GPU on macOS 13 or newer)."),
 						10.0f);
 					mfx_log_once = true;
 				}

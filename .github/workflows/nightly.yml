@@ -14,11 +14,6 @@
 name: Nightly
 
 on:
-  push:
-    branches: [master]       # build a nightly on every push to master
-    paths-ignore:
-      - '**/*.md'            # skip doc-only pushes
-      - 'docs/**'
   schedule:
     - cron: '0 8 * * *'      # 08:00 UTC daily
   workflow_dispatch:
@@ -125,6 +120,8 @@ jobs:
       jobName: "macOS arm64"
       artifactPrefixName: "armsx2-macos-arm64"
       fetchTags: true
+      sign_and_notarize: true
+    secrets: inherit
 
   pc-linux-arm64:
     name: PC · Linux arm64 (Qt)

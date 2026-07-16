@@ -2116,7 +2116,8 @@ SCAJ-20125:
   name: "Tekken 5"
   region: "NTSC-Unk"
   clampModes:
-    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -2128,7 +2129,8 @@ SCAJ-20126:
   name: "Tekken 5"
   region: "NTSC-Unk"
   clampModes:
-    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -2665,7 +2667,8 @@ SCAJ-20199:
   name: "Tekken 5 [PlayStation2 the Best]"
   region: "NTSC-Unk"
   clampModes:
-    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -2969,6 +2972,9 @@ SCCS-60002:
 SCED-50041:
   name: "Tekken Tag Tournament [Demo]"
   region: "PAL-E"
+  clampModes:
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SCED-50065:
@@ -3279,6 +3285,9 @@ SCED-51111:
 SCED-51120:
   name: "Tekken 4 [Demo]"
   region: "PAL-E"
+  clampModes:
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SCED-51140:
@@ -4405,7 +4414,8 @@ SCED-53538:
   name: "Tekken 5 [Demo]"
   region: "PAL-M5"
   clampModes:
-    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -4830,6 +4840,9 @@ SCES-50001:
   name: "Tekken Tag Tournament"
   region: "PAL-M5"
   compat: 5
+  clampModes:
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SCES-50002:
@@ -5201,6 +5214,9 @@ SCES-50878:
   name: "Tekken 4"
   region: "PAL-M5"
   compat: 5
+  clampModes:
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SCES-50885:
@@ -5335,6 +5351,8 @@ SCES-50982:
 SCES-50987:
   name: "Resident Evil - Outbreak"
   region: "PAL-Unk"
+  gsHWFixes:
+    minimumBlendingLevel: 0 # Fixes transparecy effect.
 SCES-51003:
   name: "Network Access Disc"
   region: "PAL-E"
@@ -5928,11 +5946,15 @@ SCES-52460:
     - InstantDMAHack # Fixes holes in face geometry.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves metal reflections and shadow quality.
-    cpuSpriteRenderBW: 4 # Fixes character and water textures.
+    cpuSpriteRenderBW: 1 # Fixes character and water textures.
     cpuSpriteRenderLevel: 2 # Needed for above.
-    autoFlush: 2 # Fixes lighting.
+    autoFlush: 1 # Fixes lighting.
     halfPixelOffset: 5 # Aligns post-processing and fixes desert tiles.
     nativeScaling: 2 # Fixes lighting effects due to upscaling.
+    textureInsideRT: 2 # Fixes texture-inside-target effects.
+    gpuTargetCLUT: 2 # Fixes CLUT-based lighting.
+    cpuCLUTRender: 2 # Fixes colour LUT rendering.
+    limit24BitDepth: 2 # Prioritise lower 24-bit depth.
 SCES-52529:
   name: "Sly 2 - Band of Thieves"
   region: "PAL-M11"
@@ -6126,7 +6148,8 @@ SCES-53202:
   region: "PAL-M5"
   compat: 5
   clampModes:
-    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -7601,11 +7624,15 @@ SCKA-20040:
     - InstantDMAHack # Fixes holes in face geometry.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves metal reflections and shadow quality.
-    cpuSpriteRenderBW: 4 # Fixes character and water textures.
+    cpuSpriteRenderBW: 1 # Fixes character and water textures.
     cpuSpriteRenderLevel: 2 # Needed for above.
-    autoFlush: 2 # Fixes lighting.
+    autoFlush: 1 # Fixes lighting.
     halfPixelOffset: 5 # Aligns post-processing and fixes desert tiles.
     nativeScaling: 2 # Fixes lighting effects due to upscaling.
+    textureInsideRT: 2 # Fixes texture-inside-target effects.
+    gpuTargetCLUT: 2 # Fixes CLUT-based lighting.
+    cpuCLUTRender: 2 # Fixes colour LUT rendering.
+    limit24BitDepth: 2 # Prioritise lower 24-bit depth.
 SCKA-20041:
   name: "아이토이 - 플레이 2"
   name-en: "EyeToy - Play 2"
@@ -7640,6 +7667,9 @@ SCKA-20045:
   name: "철권　４ [PlayStation 2 Big Hit Series]"
   name-en: "Tekken 4 [PlayStation 2 Big Hit Series]"
   region: "NTSC-K"
+  clampModes:
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SCKA-20046:
@@ -7693,7 +7723,8 @@ SCKA-20049:
   name-en: "Tekken 5"
   region: "NTSC-K"
   clampModes:
-    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -7982,7 +8013,8 @@ SCKA-20081:
   name-en: "Tekken 5 [PlayStation 2 BigHit Series]"
   region: "NTSC-K"
   clampModes:
-    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -10791,6 +10823,9 @@ SCPS-55017:
   name-en: "Tekken 4"
   region: "NTSC-J"
   compat: 3
+  clampModes:
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1
 SCPS-55018:
@@ -11078,6 +11113,9 @@ SCPS-56002:
   name-en: "Tekken Tag Tournament"
   region: "NTSC-K"
   compat: 5
+  clampModes:
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SCPS-56003:
@@ -11105,6 +11143,9 @@ SCPS-56006:
   name-en: "Tekken 4"
   region: "NTSC-K"
   compat: 5
+  clampModes:
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1
 SCPS-56007:
@@ -12138,11 +12179,15 @@ SCUS-97330:
     - InstantDMAHack # Fixes holes in face geometry.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves metal reflections and shadow quality.
-    cpuSpriteRenderBW: 4 # Fixes character and water textures.
+    cpuSpriteRenderBW: 1 # Fixes character and water textures.
     cpuSpriteRenderLevel: 2 # Needed for above.
-    autoFlush: 2 # Fixes lighting.
+    autoFlush: 1 # Fixes lighting.
     halfPixelOffset: 5 # Aligns post-processing and fixes desert tiles.
     nativeScaling: 2 # Fixes lighting effects due to upscaling.
+    textureInsideRT: 2 # Fixes texture-inside-target effects.
+    gpuTargetCLUT: 2 # Fixes CLUT-based lighting.
+    cpuCLUTRender: 2 # Fixes colour LUT rendering.
+    limit24BitDepth: 2 # Prioritise lower 24-bit depth.
 SCUS-97331:
   name: "Official U.S. PlayStation Magazine Demo Disc 078"
   region: "NTSC-U"
@@ -13016,11 +13061,15 @@ SCUS-97516:
     - InstantDMAHack # Fixes holes in face geometry.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves metal reflections and shadow quality.
-    cpuSpriteRenderBW: 4 # Fixes character and water textures.
+    cpuSpriteRenderBW: 1 # Fixes character and water textures.
     cpuSpriteRenderLevel: 2 # Needed for above.
-    autoFlush: 2 # Fixes lighting.
+    autoFlush: 1 # Fixes lighting.
     halfPixelOffset: 5 # Aligns post-processing and fixes desert tiles.
     nativeScaling: 2 # Fixes lighting effects due to upscaling.
+    textureInsideRT: 2 # Fixes texture-inside-target effects.
+    gpuTargetCLUT: 2 # Fixes CLUT-based lighting.
+    cpuCLUTRender: 2 # Fixes colour LUT rendering.
+    limit24BitDepth: 2 # Prioritise lower 24-bit depth.
 SCUS-97517:
   name: "Killzone [Greatest Hits]"
   region: "NTSC-U"
@@ -14991,9 +15040,13 @@ SLES-50120:
   name: "Rumble Racing"
   region: "PAL-M3"
   compat: 5
+  gsHWFixes:
+    minimumBlendingLevel: 3 # Fixes car shadows.
 SLES-50121:
   name: "Rumble Racing"
   region: "PAL-Unk"
+  gsHWFixes:
+    minimumBlendingLevel: 3 # Fixes car shadows.
 SLES-50126:
   name: "Quake III - Revolution"
   region: "PAL-M3"
@@ -15446,6 +15499,14 @@ SLES-50276:
   name: "The Gift"
   name-sort: "Gift, The"
   region: "PAL-E"
+  patches:
+    CC76CD02:
+      content: |-
+        // Sound RPC races because of shared send/receive buffers with badly
+        // placed wait loop, fix by forcing all sound rpc to be synchronous.
+        // Ideal fix would be moving the rpc wait loop though.
+        author=Ziemas
+        patch=0,EE,002159e0,word,00000000
 SLES-50277:
   name: "Red Faction"
   region: "PAL-E"
@@ -16211,7 +16272,7 @@ SLES-50672:
   compat: 5
   gsHWFixes:
     roundSprite: 1 # Fixes lines in menus.
-    textureInsideRT: 1 # Fixes half right.
+    textureInsideRT: 2 # Fixes half right.
     estimateTextureRegion: 1 # Improves performance and reduces hash cache size.
     gpuPaletteConversion: 1 # Reduces hashcache size and improves performance.
 SLES-50677:
@@ -18506,6 +18567,8 @@ SLES-51588:
 SLES-51589:
   name: "Resident Evil - Outbreak"
   region: "PAL-M5"
+  gsHWFixes:
+    minimumBlendingLevel: 0 # Fixes transparecy effect.
   patches:
     47C231CC:
       content: |-
@@ -20016,7 +20079,7 @@ SLES-52187:
   region: "PAL-M3"
   compat: 5
   gsHWFixes:
-    textureInsideRT: 1 # Fixes half right.
+    textureInsideRT: 2 # Fixes half right.
     estimateTextureRegion: 1 # Improves performance and reduces hash cache size.
     gpuPaletteConversion: 1 # Reduces hashcache size and improves performance.
     roundSprite: 1 # Fixes lines in sprites but still some lines left.
@@ -20025,7 +20088,7 @@ SLES-52188:
   region: "PAL-M3"
   compat: 5
   gsHWFixes:
-    textureInsideRT: 1 # Fixes half right.
+    textureInsideRT: 2 # Fixes half right.
     estimateTextureRegion: 1 # Improves performance and reduces hash cache size.
     gpuPaletteConversion: 1 # Reduces hashcache size and improves performance.
     roundSprite: 1 # Fixes lines in sprites but still some lines left.
@@ -23944,6 +24007,8 @@ SLES-53518:
 SLES-53521:
   name: "Musashi - Samurai Legend"
   region: "PAL-M4"
+  gsHWFixes:
+    mergeSprite: 1 # Fixes ghosting.
 SLES-53523:
   name: "Gun"
   region: "PAL-M4"
@@ -23957,12 +24022,16 @@ SLES-53523:
 SLES-53524:
   name: "Mortal Kombat - Shaolin Monks"
   region: "PAL-M5"
+  clampModes:
+    eeClampMode: 3 # Full EE clamp — fixes geometry/effects.
   gsHWFixes:
     halfPixelOffset: 5 # Fixes effect alignment.
     autoFlush: 2 # Fixes bloom intensity
 SLES-53525:
   name: "Mortal Kombat - Shaolin Monks"
   region: "PAL-G"
+  clampModes:
+    eeClampMode: 3 # Full EE clamp — fixes geometry/effects.
   gsHWFixes:
     halfPixelOffset: 5 # Fixes effect alignment.
     autoFlush: 2 # Fixes bloom intensity
@@ -25427,6 +25496,8 @@ SLES-53955:
 SLES-53956:
   name: "Aeon Flux"
   region: "PAL-E"
+  speedHacks:
+    eeCycleRate: 1 # Improves performance.
   compat: 5
 SLES-53957:
   name: "Namco Museum - 50th Anniversary"
@@ -25881,6 +25952,7 @@ SLES-54123:
   clampModes:
     vu1ClampMode: 3 # Fixes triangle holes in geometry.
   speedHacks:
+    instantVU1: 0 # Fixes break rendering
     mtvu: 0 # Fixes internal FPS stuttering and freezing.
 SLES-54124:
   name: "The Quest for Aladdin's Treasure"
@@ -26018,6 +26090,8 @@ SLES-54160:
 SLES-54161:
   name: "Super Dragon Ball Z"
   region: "PAL-E"
+  gsHWFixes:
+    texturePreloading: 0 # Fixes visual glitch
 SLES-54162:
   name: "Saint Seiya - The Hades"
   region: "PAL-M4"
@@ -26074,6 +26148,8 @@ SLES-54168:
 SLES-54169:
   name: "Aeon Flux"
   region: "PAL-M4"
+  speedHacks:
+    eeCycleRate: 1 # Improves performance.
 SLES-54170:
   name: "Jaws Unleashed"
   region: "PAL-M5"
@@ -26815,7 +26891,7 @@ SLES-54385:
   gameFixes:
     - SoftwareRendererFMVHack # Flickering in FMV.
   gsHWFixes:
-    roundSprite: 1 # Fixes font artifacts for health and other sprites.
+    roundSprite: 2 # Fixes font artifacts for health and other sprites.
     texturePreloading: 0 # Improves performance and prevents it disabling itself regardless.
 SLES-54388:
   name: "Disney's Kim Possible - What's the Switch?"
@@ -27478,7 +27554,7 @@ SLES-54586:
   name: "Ar tonelico - Melody of Elemia"
   region: "PAL-E"
   gsHWFixes:
-    roundSprite: 1 # Fixes vertical lines in FMVs, character portraits and other sprites.
+    roundSprite: 2 # Fixes vertical lines in FMVs, character portraits and other sprites.
 SLES-54587:
   name: "Raw Danger"
   region: "PAL-E"
@@ -28276,7 +28352,7 @@ SLES-54822:
   name: "Atelier Iris 3 - Grand Phantasm"
   region: "PAL-E"
   gsHWFixes:
-    roundSprite: 1 # Fixes vertical lines in FMVs, character portraits and other sprites.
+    roundSprite: 2 # Fixes vertical lines in FMVs, character portraits and other sprites.
 SLES-54825:
   name: "Bob the Builder"
   region: "PAL-M3"
@@ -30401,6 +30477,9 @@ SLES-55492:
 SLES-55493:
   name: "Marvel - Ultimate Alliance 2"
   region: "PAL-E"
+  speedHacks:
+    instantVU1: 0 # Fixes break rendering.
+    mtvu: 0 # Fixes break rendering.
 SLES-55494:
   name: "X-Men Origins - Wolverine"
   region: "PAL-E-F"
@@ -30897,12 +30976,14 @@ SLES-82018:
   name: "Cy Girls [Ice] [Disc 1 of 2]"
   region: "PAL-M3"
   gsHWFixes:
+    roundSprite: 2 # Fixes NPC walking onscreen
     halfPixelOffset: 5 # Fixes post-processing alignment.
     nativeScaling: 2 # Fixes post-processing intensity.
 SLES-82019:
   name: "Cy Girls [Aska] [Disc 2 of 2]"
   region: "PAL-M3"
   gsHWFixes:
+    roundSprite: 2 # Fixes NPC walking onscreen.
     halfPixelOffset: 5 # Fixes post-processing alignment.
     nativeScaling: 2 # Fixes post-processing intensity.
   memcardFilters:
@@ -30911,12 +30992,14 @@ SLES-82020:
   name: "Cy Girls [Ice] [Disc 1 of 2]"
   region: "PAL-M3"
   gsHWFixes:
+    roundSprite: 2 # Fixes NPC walking onscreen.
     halfPixelOffset: 5 # Fixes post-processing alignment.
     nativeScaling: 2 # Fixes post-processing intensity.
 SLES-82021:
   name: "Cy Girls [Aska] [Disc 2 of 2]"
   region: "PAL-M3"
   gsHWFixes:
+    roundSprite: 2 # Fixes NPC walking onscreen.
     halfPixelOffset: 5 # Fixes post-processing alignment.
     nativeScaling: 2 # Fixes post-processing intensity.
   memcardFilters:
@@ -46389,7 +46472,7 @@ SLPM-65845:
   region: "NTSC-J"
   compat: 5
   gsHWFixes:
-    textureInsideRT: 1 # Fixes half right.
+    textureInsideRT: 2 # Fixes half right.
     estimateTextureRegion: 1 # Improves performance and reduces hash cache size.
     gpuPaletteConversion: 1 # Reduces hashcache size and improves performance.
     roundSprite: 1 # Fixes lines in sprites but still some lines left.
@@ -55062,6 +55145,9 @@ SLPS-20015:
   name-en: "Tekken Tag Tournament"
   region: "NTSC-J"
   compat: 5
+  clampModes:
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLPS-20016:
@@ -58170,6 +58256,9 @@ SLPS-25100:
   name-en: "Tekken 4"
   region: "NTSC-J"
   compat: 5
+  clampModes:
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLPS-25101:
@@ -58395,7 +58484,7 @@ SLPS-25139:
   compat: 5
   gsHWFixes:
     roundSprite: 1 # Fixes lines in menus.
-    textureInsideRT: 1 # Fixes half right.
+    textureInsideRT: 2 # Fixes half right.
     estimateTextureRegion: 1 # Improves performance and reduces hash cache size.
     gpuPaletteConversion: 1 # Reduces hashcache size and improves performance.
 SLPS-25140:
@@ -58405,7 +58494,7 @@ SLPS-25140:
   region: "NTSC-J"
   gsHWFixes:
     roundSprite: 1 # Fixes lines in menus.
-    textureInsideRT: 1 # Fixes half right.
+    textureInsideRT: 2 # Fixes half right.
     estimateTextureRegion: 1 # Improves performance and reduces hash cache size.
     gpuPaletteConversion: 1 # Reduces hashcache size and improves performance.
 SLPS-25141:
@@ -59272,7 +59361,7 @@ SLPS-25291:
   compat: 5
   gsHWFixes:
     roundSprite: 1 # Fixes lines in menus.
-    textureInsideRT: 1 # Fixes half right.
+    textureInsideRT: 2 # Fixes half right.
     estimateTextureRegion: 1 # Improves performance and reduces hash cache size.
     gpuPaletteConversion: 1 # Reduces hashcache size and improves performance.
 SLPS-25292:
@@ -60665,7 +60754,8 @@ SLPS-25510:
   region: "NTSC-J"
   compat: 5
   clampModes:
-    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -61235,7 +61325,7 @@ SLPS-25604:
   name-en: "Ar tonelico - Sekai no Owari de Utai Tsuzukeru Shoujo"
   region: "NTSC-J"
   gsHWFixes:
-    roundSprite: 1 # Fixes vertical lines in FMVs, character portraits and other sprites.
+    roundSprite: 2 # Fixes vertical lines in FMVs, character portraits and other sprites.
 SLPS-25605:
   name: "NEOGEOオンラインコレクション Vol.3 THE KING OF FIGHTERS ～オロチ編～ [通常版]"
   name-sort: "ねおじおおんらいんこれくしょん Vol. 3 ざ きんぐ おぶ ふぁいたーず おろちへん [つうじょうばん]"
@@ -61488,6 +61578,8 @@ SLPS-25642:
   name-en: "Super Dragon Ball Z"
   region: "NTSC-J"
   compat: 5
+  gsHWFixes:
+    texturePreloading: 0 # Fixes visual glitch
 SLPS-25643:
   name: "キミキス"
   name-sort: "きみきす"
@@ -63656,6 +63748,9 @@ SLPS-71501:
   name-sort: "てっけんたっぐとーなめんと [MEGA HITS!]"
   name-en: "Tekken Tag Tournament [MEGA HITS!]"
   region: "NTSC-J"
+  clampModes:
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLPS-71502:
@@ -63752,6 +63847,9 @@ SLPS-73104:
   name-sort: "てっけんたっぐとーなめんと [PlayStation2 the Best]"
   name-en: "Tekken Tag Tournament [PlayStation2 the Best]"
   region: "NTSC-J"
+  clampModes:
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLPS-73105:
@@ -63888,6 +63986,9 @@ SLPS-73209:
   name-sort: "てっけん4 [PlayStation2 the Best]"
   name-en: "Tekken 4 [PlayStation2 the Best]"
   region: "NTSC-J"
+  clampModes:
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLPS-73210:
@@ -64005,7 +64106,8 @@ SLPS-73223:
   name-en: "Tekken 5 [PlayStation2 the Best]"
   region: "NTSC-J"
   clampModes:
-    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -64279,7 +64381,7 @@ SLPS-73249:
   name-en: "Ar tonelico - Sekai no Owari de Utai Tsuzukeru Shoujo [PlayStation2 the Best]"
   region: "NTSC-J"
   gsHWFixes:
-    roundSprite: 1 # Fixes vertical lines in FMVs, character portraits and other sprites.
+    roundSprite: 2 # Fixes vertical lines in FMVs, character portraits and other sprites.
 SLPS-73250:
   name: "エースコンバット・ゼロ・ザ・ベルカン・ウォー [PlayStation2 the Best]"
   name-sort: "えーすこんばっと・ぜろ・ざ・べるかん・うぉー [PlayStation2 the Best]"
@@ -64656,6 +64758,9 @@ SLUS-20001:
   name: "Tekken Tag Tournament"
   region: "NTSC-U"
   compat: 5
+  clampModes:
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLUS-20002:
@@ -64784,7 +64889,7 @@ SLUS-20035:
     - SoftwareRendererFMVHack # Fixes FMVs.
   gsHWFixes:
     roundSprite: 1 # Fixes lines in menus.
-    textureInsideRT: 1 # Fixes half right.
+    textureInsideRT: 2 # Fixes half right.
     estimateTextureRegion: 1 # Improves performance and reduces hash cache size.
     gpuPaletteConversion: 1 # Reduces hashcache size and improves performance.
 SLUS-20037:
@@ -65332,6 +65437,9 @@ SLUS-20173:
 SLUS-20174:
   name: "Rumble Racing"
   region: "NTSC-U"
+  compat: 5
+  gsHWFixes:
+    minimumBlendingLevel: 3 # Fixes car shadows.
 SLUS-20175:
   name: "Mobile Suit Gundam - Journey to Jaburo"
   region: "NTSC-U"
@@ -66058,6 +66166,9 @@ SLUS-20328:
   name: "Tekken 4"
   region: "NTSC-U"
   compat: 5
+  clampModes:
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLUS-20329:
@@ -67939,7 +68050,7 @@ SLUS-20675:
   gameFixes:
     - SoftwareRendererFMVHack # Fixes FMVs.
   gsHWFixes:
-    textureInsideRT: 1 # Fixes half right.
+    textureInsideRT: 2 # Fixes half right.
     estimateTextureRegion: 1 # Improves performance and reduces hash cache size.
     gpuPaletteConversion: 1 # Reduces hashcache size and improves performance.
     roundSprite: 1 # Fixes lines in sprites but still some lines left.
@@ -68069,6 +68180,7 @@ SLUS-20697:
   region: "NTSC-U"
   compat: 5
   gsHWFixes:
+    roundSprite: 2 # Fixes NPC walking onscreen.
     halfPixelOffset: 5 # Fixes post-processing alignment.
     nativeScaling: 2 # Fixes post-processing intensity.
 SLUS-20698:
@@ -68445,6 +68557,8 @@ SLUS-20765:
   name: "Resident Evil - Outbreak"
   region: "NTSC-U"
   compat: 5
+  gsHWFixes:
+    minimumBlendingLevel: 0 # Fixes transparecy effect.
   patches:
     0245EF6D:
       content: |-
@@ -68879,6 +68993,7 @@ SLUS-20854:
   region: "NTSC-U"
   compat: 5
   gsHWFixes:
+    roundSprite: 2 # Fixes NPC walking onscreen.
     halfPixelOffset: 5 # Fixes post-processing alignment.
     nativeScaling: 2 # Fixes post-processing intensity.
   memcardFilters:
@@ -69678,6 +69793,8 @@ SLUS-20983:
   name: "Musashi Samurai Legend"
   region: "NTSC-U"
   compat: 5
+  gsHWFixes:
+    mergeSprite: 1 # Fixes ghosting.
 SLUS-20984:
   name: "Resident Evil Outbreak - File #2"
   region: "NTSC-U"
@@ -69816,6 +69933,8 @@ SLUS-21005:
   compat: 5
   gsHWFixes:
     autoFlush: 1 # Fixes effects.
+    cpuSpriteRenderBW: 2 # Fixes ghosting/trailing on hardware renderers (with autoFlush).
+    cpuSpriteRenderLevel: 2 # Needed for above.
     roundSprite: 1 # Fixes upscaling artifacts.
     halfPixelOffset: 5 # Fixes post bloom positioning.
     nativeScaling: 4 # Fixes lighting effects due to upscaling.
@@ -70194,7 +70313,8 @@ SLUS-21059:
   region: "NTSC-U"
   compat: 5
   clampModes:
-    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -70344,6 +70464,8 @@ SLUS-21087:
   name: "Mortal Kombat - Shaolin Monks"
   region: "NTSC-U"
   compat: 5
+  clampModes:
+    eeClampMode: 3 # Full EE clamp — fixes geometry/effects.
   gsHWFixes:
     halfPixelOffset: 5 # Fixes effect alignment.
     autoFlush: 2 # Fixes bloom intensity
@@ -70766,7 +70888,8 @@ SLUS-21160:
   name: "Tekken 5 [Demo]"
   region: "NTSC-U"
   clampModes:
-    eeClampMode: 2 # Fixes camera and stops constant coin noises on Pirates Cove.
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     recommendedBlendingLevel: 3 # Improves effect rendering on various levels.
     halfPixelOffset: 4 # Align post.
@@ -71054,6 +71177,8 @@ SLUS-21204:
 SLUS-21205:
   name: "Aeon Flux"
   region: "NTSC-U"
+  speedHacks:
+    eeCycleRate: 1 # Improves performance.
   compat: 5
 SLUS-21206:
   name: "Shining Force Neo"
@@ -71946,7 +72071,7 @@ SLUS-21327:
   gameFixes:
     - SoftwareRendererFMVHack # Flickering in FMV.
   gsHWFixes:
-    roundSprite: 1 # Fixes font artifacts for health and other sprites.
+    roundSprite: 2 # Fixes font artifacts for health and other sprites.
     texturePreloading: 0 # Improves performance and prevents it disabling itself regardless.
 SLUS-21328:
   name: "Pac-Man World Rally"
@@ -72305,6 +72430,9 @@ SLUS-21374:
   compat: 5
   clampModes:
     vu1ClampMode: 3 # Fixes triangle holes in geometry.
+  speedHacks:
+    instantVU1: 0 # Fixes break rendering.
+    mtvu: 0 # Fixes break rendering.
 SLUS-21375:
   name: "Torino 2006 - The Official Game of the XX Olympic Winter Games"
   region: "NTSC-U"
@@ -72764,6 +72892,8 @@ SLUS-21442:
   name: "Super Dragon Ball Z"
   region: "NTSC-U"
   compat: 5
+  gsHWFixes:
+    texturePreloading: 0 # Fixes visual glitch
 SLUS-21443:
   name: "The Da Vinci Code"
   name-sort: "Da Vinci Code, The"
@@ -72785,7 +72915,7 @@ SLUS-21445:
   region: "NTSC-U"
   compat: 5
   gsHWFixes:
-    roundSprite: 1 # Fixes vertical lines in FMVs, character portraits and other sprites.
+    roundSprite: 2 # Fixes vertical lines in FMVs, character portraits and other sprites.
 SLUS-21446:
   name: "Family Feud"
   region: "NTSC-U"
@@ -73314,7 +73444,7 @@ SLUS-21564:
   region: "NTSC-U"
   compat: 5
   gsHWFixes:
-    roundSprite: 1 # Fixes vertical lines in FMVs, character portraits and other sprites.
+    roundSprite: 2 # Fixes vertical lines in FMVs, character portraits and other sprites.
 SLUS-21565:
   name: "Pirates of the Caribbean - At World's End"
   region: "NTSC-U"
@@ -73448,6 +73578,8 @@ SLUS-21588:
   name: "Avatar - The Last Airbender - The Burning Earth"
   region: "NTSC-U"
   compat: 5
+  gsHWFixes:
+    minimumBlendingLevel: 3 # Fixes missing lighting and skin color.
 SLUS-21589:
   name: "Pinball Hall of Fame - The Williams Collection"
   region: "NTSC-U"
@@ -74725,6 +74857,8 @@ SLUS-21804:
   name: "Avatar - The Last Airbender - Into the Inferno"
   region: "NTSC-U"
   compat: 5
+  gsHWFixes:
+    minimumBlendingLevel: 3 # Fixes missing lighting and skin color.
 SLUS-21805:
   name: "Hasbro Family Game Night"
   region: "NTSC-U"
@@ -75069,6 +75203,9 @@ SLUS-21879:
   name: "Marvel - Ultimate Alliance 2"
   region: "NTSC-U"
   compat: 5
+  speedHacks:
+    instantVU1: 0 # Fixes break rendering.
+    mtvu: 0 # Fixes break rendering.
 SLUS-21880:
   name: "X-Men Origins - Wolverine"
   region: "NTSC-U"
@@ -75463,6 +75600,9 @@ SLUS-28010:
 SLUS-28012:
   name: "Tekken 4 [Trade Demo]"
   region: "NTSC-U"
+  clampModes:
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLUS-28013:
@@ -75757,6 +75897,9 @@ SLUS-29033:
 SLUS-29034:
   name: "Tekken 4 [Regular Demo]"
   region: "NTSC-U"
+  clampModes:
+    eeClampMode: 3 # Fixes camera and stops constant coin noises on Pirates Cove.
+    vu1ClampMode: 2 # Fixes broken effects.
   gsHWFixes:
     alignSprite: 1 # Fixes vertical lines.
 SLUS-29035:

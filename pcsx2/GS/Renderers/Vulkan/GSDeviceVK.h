@@ -83,6 +83,10 @@ public:
 	/// Returns true if running on an AMD GPU.
 	__fi bool IsDeviceAMD() const { return (m_device_properties.vendorID == 0x1002); }
 
+	/// Returns true if running on a Broadcom V3D GPU (vendorID 0x14E4) — i.e. the
+	/// Raspberry Pi's VideoCore under Mesa's V3DV, reached via the Linux arm64 build.
+	__fi bool IsDeviceBroadcom() const { return (m_device_properties.vendorID == 0x14E4u); }
+
 	/// Returns true if running on an ARM Mali GPU (vendorID 0x13B5).
 	__fi bool IsDeviceMali() const { return (m_device_properties.vendorID == 0x13B5u); }
 
@@ -287,10 +291,8 @@ private:
 	// vkCmdPushDescriptorSetKHR, so texture binding falls back to per-frame descriptor sets.
 	bool m_use_push_descriptors = true;
 
-	// True when the SoC hints look like MediaTek (Dimensity/Helio). Set in CheckFeatures
-	// from GpuProfileDetector; used to disable the broken Vulkan fbfetch path on their
-	// Mali stacks (zero/stale Cd → black/missing textures). Ported from EmuCoreX.
-	bool m_is_mediatek_soc = false;
+	// MediaTek-SoC detection now lives in the base GSDevice (SetMediaTekSoC/IsMediaTekSoC),
+	// so both backends and GS.cpp's Android GameDB overrides can read it.
 
 	VkQueue m_graphics_queue = VK_NULL_HANDLE;
 	VkQueue m_present_queue = VK_NULL_HANDLE;
@@ -536,6 +538,18 @@ private:
 		ShaderInterlace shader, Filter filter, const InterlaceConstantBuffer& cb) final;
 	void DoShadeBoost(GSTexture* sTex, GSTexture* dTex, const float params[4]) final;
 	void DoFXAA(GSTexture* sTex, GSTexture* dTex) final;
+	bool DoApplyShaderChain(GSTexture* sTex, GSTexture* dTex) override;
+
+	/// librashader filter chain state. The handle is void* rather than
+	/// libra_vk_filter_chain_t so this header doesn't need librashader.h — that header
+	/// only exists when the Rust toolchain built the lib (ARMSX2_HAS_LIBRASHADER).
+	/// The chain is rebuilt only when the preset path changes: creating it compiles the
+	/// whole slang chain, while the per-frame call is just command recording.
+	void* m_shader_chain = nullptr;
+	std::string m_shader_chain_preset;
+	bool m_shader_chain_failed = false;
+	size_t m_shader_frame_count = 0;
+	void DestroyShaderChain();
 
 	bool DoCAS(
 		GSTexture* sTex, GSTexture* dTex, bool sharpen_only, const std::array<u32, NUM_CAS_CONSTANTS>& constants) final;

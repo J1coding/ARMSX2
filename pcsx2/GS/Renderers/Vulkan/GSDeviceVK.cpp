@@ -24,6 +24,14 @@
 
 #include "imgui.h"
 
+#ifdef ARMSX2_HAS_LIBRASHADER
+// librashader only declares its Vulkan entry points when the consumer opts in, and it
+// needs the Vulkan types already in scope — GSDeviceVK.h pulls those in above. Defined
+// by CMake only when the Rust toolchain actually produced the library.
+#define LIBRA_RUNTIME_VULKAN
+#include "librashader.h"
+#endif
+
 #include <bit>
 #include <limits>
 #include <mutex>
@@ -431,21 +439,18 @@ bool GSDeviceVK::SelectDeviceExtensions(ExtensionList* extension_list, bool enab
 	m_optional_extensions.vk_ext_rasterization_order_attachment_access =
 		SupportsExtension(VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME, false) ||
 		SupportsExtension(VK_ARM_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME, false);
-	// VK_EXT_attachment_feedback_loop_layout: disable on Mali (vendorID 0x13B5). The Mali
-	// blob's implementation returns zero/stale destination color in the feedback-loop layout,
-	// producing black/missing textures and, on some driver revisions, device-lost crashes
-	// (found on MediaTek-Mali stacks by the EmuCoreX dev). We fall back to texture_barrier
-	// there. Adreno/other vendors are unaffected. m_device_properties isn't populated yet at
-	// this point, so read the vendor straight off the physical device.
-	bool is_mali_vendor = false;
-	if (m_physical_device != VK_NULL_HANDLE)
-	{
-		VkPhysicalDeviceProperties phys_props = {};
-		vkGetPhysicalDeviceProperties(m_physical_device, &phys_props);
-		is_mali_vendor = (phys_props.vendorID == 0x13B5u);
-	}
+	// VK_EXT_attachment_feedback_loop_layout: the in-tile feedback-loop path is what lets
+	// accurate blending run WITHOUT the per-primitive texture-barrier "slideshow". We used to
+	// blanket-disable it on Mali (vendorID 0x13B5) after the EmuCoreX dev saw stale-color /
+	// device-lost on SOME MediaTek-Mali blobs — but that demoted EVERY modern Mali (e.g.
+	// Mali-G615 on r44p1) to the barrier path, costing ~3-4x on blend-heavy games. izzy2lost's
+	// PSX2 (PCSX2_ARM64) keeps it enabled on Mali and runs those same devices full-speed, so
+	// the disable was over-broad. Enable wherever the driver advertises it; the authoritative
+	// feature-bit reconciliation below (attachmentFeedbackLoopLayout == VK_TRUE) still filters
+	// blobs that don't truly support it. If a specific old blob regresses, narrow by driver
+	// version rather than re-blocking the whole vendor.
 	m_optional_extensions.vk_ext_attachment_feedback_loop_layout =
-		SupportsExtension(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME, false) && !is_mali_vendor;
+		SupportsExtension(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME, false);
 	m_optional_extensions.vk_ext_line_rasterization = SupportsExtension(VK_EXT_LINE_RASTERIZATION_EXTENSION_NAME, false);
 	m_optional_extensions.vk_khr_driver_properties = SupportsExtension(VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME, false);
 
@@ -728,6 +733,24 @@ bool GSDeviceVK::CreateDevice(VkSurfaceKHR surface, bool enable_validation_layer
 		static_cast<u32>(m_device_properties.limits.timestampComputeAndGraphics),
 		queue_family_properties[m_graphics_queue_family_index].timestampValidBits,
 		m_device_properties.limits.timestampPeriod);
+
+#if defined(__ANDROID__)
+	// Mali-G615 (Valhall 4th-gen) on the r44p1 blob advertises timestampValidBits>0, but its
+	// timestamp query pool never resolves even after the command-buffer fence signals —
+	// vkGetQueryPoolResults returns VK_NOT_READY every frame ("(CommandBufferCompleted)
+	// vkGetQueryPoolResults failed: VK_NOT_READY"), and the present spin-manager that leans on
+	// those timestamps stalls into a multi-second freeze (Burnout 3 at native res). Disable GPU
+	// timing + present spinning on THIS GPU only: other Mali report better results with them on,
+	// so the gate is deliberately narrow (deviceName match, not a blanket Mali rule). Costs only
+	// the GPU-time OSD stat and a present-pacing optimisation; rendering correctness is unaffected.
+	if (m_device_properties.vendorID == 0x13B5u &&
+		std::string_view(m_device_properties.deviceName).find("Mali-G615") != std::string_view::npos)
+	{
+		Console.WriteLn("Mali-G615: disabling GPU timing + present spinning (r44p1 timestamp-query VK_NOT_READY freeze).");
+		m_gpu_timing_supported = false;
+		m_spinning_supported = false;
+	}
+#endif
 
 	m_gpu_pipeline_statistics_supported = (m_device_features.pipelineStatisticsQuery != 0);
 	DevCon.WriteLn("GPU pipeline statistics is %s", m_gpu_pipeline_statistics_supported ? "supported" : "not supported");
@@ -2374,6 +2397,10 @@ void GSDeviceVK::Destroy()
 
 	GSDevice::Destroy();
 
+	// Free the filter chain before the device goes away — it owns Vulkan objects created
+	// against m_device, so tearing the device down first would leak/UB them.
+	DestroyShaderChain();
+
 	EndRenderPass();
 	if (GetCurrentCommandBuffer() != VK_NULL_HANDLE)
 	{
@@ -2908,6 +2935,11 @@ bool GSDeviceVK::CheckFeatures()
 	// that path, and the Vulkan renderer never reads the runtime profile anyway (only
 	// GSDeviceOGL does), so the force was dead weight that diverged from his known-good tree.
 
+	// Set when the user (or auto-detection) selects the Xclipse GPU profile; forces the
+	// Xclipse fbfetch-off path below even if the 0x144D vendorID guess doesn't fire on
+	// their driver. Declared outside the Android block so it stays a harmless false on
+	// desktop. Populated from the resolved mobile profile just below.
+	bool force_xclipse_profile = false;
 #if defined(__ANDROID__)
 	// MediaTek (Dimensity/Helio) Mali Vulkan stacks return zero/stale destination color
 	// through ROAA (black / missing textures) across GPU generations, so detect the SoC
@@ -2915,7 +2947,9 @@ bool GSDeviceVK::CheckFeatures()
 	// ro.soc.* props already folded into the profile hints (no new JNI needed).
 	const GpuProfileSelection mobile_profile = GpuProfileDetector::Resolve(
 		GSConfig.AndroidGpuProfileOverride, std::string_view(), m_device_properties.deviceName);
-	m_is_mediatek_soc = mobile_profile.is_mediatek_soc;
+	SetMediaTekSoC(mobile_profile.is_mediatek_soc);
+	force_xclipse_profile = (mobile_profile.override_mode == GpuProfileOverride::Xclipse) ||
+		(mobile_profile.runtime_profile == RuntimeGpuProfile::Xclipse);
 	// Per-vendor GS tuning (pool sizes/ages + constrained) — drives GSDevice pool sizing above.
 	// This is what constrains texture/target caching on weaker Mali (e.g. G615). From EmuCoreX.
 	SetMobileGPUIdentity(mobile_profile.gpu);
@@ -2949,16 +2983,40 @@ bool GSDeviceVK::CheckFeatures()
 	const bool is_turnip = (m_device_driver_properties.driverID == VK_DRIVER_ID_MESA_TURNIP);
 	// Samsung Xclipse (Exynos AMD-RDNA2) has no working ROAA-based framebuffer fetch — force it off
 	// there so we never route the fast-blend path into a broken unit. Inert if the 0x144D vendorID
-	// guess is wrong (a real Xclipse tester must confirm IsDeviceXclipse() fires).
-	const bool is_xclipse_vk = IsDeviceXclipse();
+	// guess is wrong (a real Xclipse tester must confirm IsDeviceXclipse() fires). The user
+	// can also force it from Settings → Renderer → GPU Profile (force_xclipse_profile) for
+	// drivers where the 0x144D vendorID doesn't report.
+	const bool is_xclipse_vk = IsDeviceXclipse() || force_xclipse_profile;
 	// MediaTek Mali + Mali-G57 expose ROAA but return zero/stale destination color from it
 	// (black or intermittently missing textures); force those onto the texture-barrier path
 	// instead of fbfetch. Ported from sashkinbro/EmuCoreX (MediaTek across GPU generations,
 	// plus the older Mali-G57 case). deviceName is null-terminated by Vulkan.
 	const bool is_mali_g57 = is_mali_vk &&
 		(std::string_view(m_device_properties.deviceName).find("Mali-G57") != std::string_view::npos);
-	const bool is_mediatek_mali_vk = is_mali_vk && m_is_mediatek_soc;
-	const bool unreliable_mali_fbfetch = is_mediatek_mali_vk || is_mali_g57;
+	const bool is_mediatek_mali_vk = is_mali_vk && IsMediaTekSoC();
+	// ForceMaliFramebufferFetch (default OFF) lets a MediaTek/G57 user re-enable fbfetch to A/B
+	// their own driver. The blanket disable above is a per-VENDOR guess ported wholesale from
+	// EmuCoreX ("MediaTek across GPU generations"), not a per-driver fact, and it is expensive
+	// on exactly this hardware: Mali reports dualSrcBlend=false, so GSRendererHW force-SW-blends
+	// every SRC1/blend-mix/PABE draw, and with fbfetch off the only way to read Cd is the
+	// per-PRIMITIVE texture barrier -- the "GT4 slideshow" path described above. Issue #339 is
+	// that collision on a Dimensity 8350 + Mali-G615 (Shadow of the Colossus lost perf when SW
+	// blend fixed its visuals). If a newer MediaTek driver reports ROAA honestly, this recovers
+	// the fast blend path; if it still lies, the user sees the black/missing textures and turns
+	// it back off -- which is why it must default OFF and stay a separate setting.
+	//
+	// Deliberately NOT reusing EnableAdrenoFramebufferFetch: that one is default-ON on Android
+	// (Settings.kt adrenoFbFetch = true, plus a ConfigStore migration that flips old saves ON),
+	// so keying off it would silently force fbfetch on for EVERY MediaTek Mali user -- the exact
+	// breakage this block exists to prevent.
+	//
+	// Xclipse stays excluded even when forced: it has no working ROAA fbfetch at all, so honouring
+	// the force there would route the fast path into a unit that cannot do it.
+	// ANGLE is likewise no escape for the user -- it translates GLES onto this same Vulkan driver.
+	// The working workaround remains the native GL renderer, whose fbfetch comes from
+	// GL_ARM_shader_framebuffer_fetch (GSDeviceOGL) and never touches the Vulkan ROAA path.
+	const bool unreliable_mali_fbfetch =
+		(is_mediatek_mali_vk || is_mali_g57) && !GSConfig.ForceMaliFramebufferFetch;
 	const bool vendor_allows_fbfetch = !unreliable_mali_fbfetch &&
 		(is_mali_vk || is_turnip || GSConfig.EnableAdrenoFramebufferFetch) && !is_xclipse_vk;
 	m_features.framebuffer_fetch = vendor_allows_fbfetch &&
@@ -3808,6 +3866,147 @@ void GSDeviceVK::DoFXAA(GSTexture* sTex, GSTexture* dTex)
 	static_cast<GSTextureVK*>(dTex)->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
 }
 
+#ifdef ARMSX2_HAS_LIBRASHADER
+
+static void ReportShaderChainError(const char* what, libra_error_t err)
+{
+	char* msg = nullptr;
+	if (libra_error_write(err, &msg) == 0 && msg)
+	{
+		Console.Error("(GS) librashader %s failed: %s", what, msg);
+		libra_error_free_string(&msg);
+	}
+	else
+	{
+		Console.Error("(GS) librashader %s failed (errno %d)", what, static_cast<int>(libra_error_errno(err)));
+	}
+	libra_error_free(&err);
+}
+
+#endif
+
+void GSDeviceVK::DestroyShaderChain()
+{
+#ifdef ARMSX2_HAS_LIBRASHADER
+	if (m_shader_chain)
+	{
+		libra_vk_filter_chain_t chain = static_cast<libra_vk_filter_chain_t>(m_shader_chain);
+		libra_vk_filter_chain_free(&chain);
+		m_shader_chain = nullptr;
+	}
+#endif
+	m_shader_chain_preset.clear();
+	m_shader_chain_failed = false;
+	m_shader_frame_count = 0;
+}
+
+bool GSDeviceVK::DoApplyShaderChain(GSTexture* sTex, GSTexture* dTex)
+{
+#ifndef ARMSX2_HAS_LIBRASHADER
+	return false;
+#else
+	// A preset that fails to compile must not be retried every frame — that would run a
+	// full slang compile 60x/sec. Latch the failure until the user picks another preset.
+	if (m_shader_chain_failed && m_shader_chain_preset == GSConfig.ShaderChainPreset)
+		return false;
+
+	if (!m_shader_chain || m_shader_chain_preset != GSConfig.ShaderChainPreset)
+	{
+		DestroyShaderChain();
+		m_shader_chain_preset = GSConfig.ShaderChainPreset;
+
+		libra_shader_preset_t preset = nullptr;
+		if (libra_error_t err = libra_preset_create(m_shader_chain_preset.c_str(), &preset))
+		{
+			ReportShaderChainError("preset load", err);
+			m_shader_chain_failed = true;
+			return false;
+		}
+
+		libra_device_vk_t vk = {};
+		vk.physical_device = m_physical_device;
+		vk.instance = m_instance;
+		vk.device = m_device;
+		vk.queue = m_graphics_queue;
+		// librashader resolves Vulkan through this loader rather than linking it, which
+		// is why it transparently rides a user's custom Turnip ICD.
+		vk.entry = vkGetInstanceProcAddr;
+
+		// create() invalidates `preset` unconditionally ("the shader preset is
+		// immediately invalidated"), so it must NOT be freed afterwards on either path.
+		libra_vk_filter_chain_t chain = nullptr;
+		if (libra_error_t err = libra_vk_filter_chain_create(&preset, vk, nullptr, &chain))
+		{
+			ReportShaderChainError("chain create", err);
+			m_shader_chain_failed = true;
+			return false;
+		}
+
+		m_shader_chain = chain;
+		m_shader_frame_count = 0;
+		Console.WriteLn("(GS) librashader: loaded preset '%s'", m_shader_chain_preset.c_str());
+	}
+
+	GSTextureVK* const src = static_cast<GSTextureVK*>(sTex);
+	GSTextureVK* const dst = static_cast<GSTextureVK*>(dTex);
+
+	// The chain records its own render passes, so it must not run inside one of ours.
+	EndRenderPass();
+
+	// librashader's contract: source in SHADER_READ_ONLY_OPTIMAL, target in
+	// COLOR_ATTACHMENT_OPTIMAL.
+	src->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+	dst->TransitionToLayout(GSTextureVK::Layout::ColorAttachment);
+
+	const libra_image_vk_t in = {src->GetImage(), src->GetVkFormat(),
+		static_cast<uint32_t>(src->GetWidth()), static_cast<uint32_t>(src->GetHeight())};
+	const libra_image_vk_t out = {dst->GetImage(), dst->GetVkFormat(),
+		static_cast<uint32_t>(dst->GetWidth()), static_cast<uint32_t>(dst->GetHeight())};
+	const libra_viewport_t vp = {0.0f, 0.0f,
+		static_cast<uint32_t>(dst->GetWidth()), static_cast<uint32_t>(dst->GetHeight())};
+
+	// Every librashader entry point takes the chain handle by address, not by value.
+	libra_vk_filter_chain_t chain = static_cast<libra_vk_filter_chain_t>(m_shader_chain);
+	if (libra_error_t err = libra_vk_filter_chain_frame(&chain, GetCurrentCommandBuffer(),
+			m_shader_frame_count, in, out, &vp, nullptr, nullptr))
+	{
+		ReportShaderChainError("frame", err);
+		m_shader_chain_failed = true;
+		return false;
+	}
+	m_shader_frame_count++;
+
+	// The chain left the target in COLOR_ATTACHMENT_OPTIMAL behind the tracker's back, so
+	// resync it WITHOUT emitting a barrier (Override), then transition for real to the
+	// ShaderReadOnly that DoFXAA/DoShadeBoost also leave behind and the presenter expects.
+	// Skipping the Override would make the next barrier start from a stale layout.
+	dst->OverrideImageLayout(GSTextureVK::Layout::ColorAttachment);
+	dst->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
+	dst->SetState(GSTexture::State::Dirty);
+
+	// librashader recycles its per-frame objects (VkImageView / VkFramebuffer / descriptor
+	// sets) on its OWN internal frame counter, over a `frames_in_flight`-deep ring
+	// (default 3): frame N destroys what frame N-3 recorded. That is only safe if every
+	// frame() call is followed by a submit, so the fence for N-3 has been waited by the
+	// time N recycles its slot.
+	//
+	// PCSX2 violates that. GSRenderer::VSync calls Merge() -- and therefore the chain --
+	// BEFORE it decides whether to present, and a skipped present (SkipDuplicateFrames,
+	// which is default-on, or the FIFO present throttle) returns early from BeginPresent
+	// and never reaches EndPresent, so it never submits. MAX_SKIPPED_DUPLICATE_FRAMES is
+	// 3 -- exactly the ring depth -- so three skipped frames in a row let librashader
+	// destroy views that are still bound to the command buffer we are STILL recording.
+	// Validation names it: VUID-vkDestroyImageView-imageView-01026, followed by the
+	// buffer going invalid and the Adreno driver segfaulting as it walks it at submit.
+	//
+	// Kicking the buffer here keeps exactly one submit per chain frame, so librashader's
+	// ring and our NUM_COMMAND_BUFFERS ring advance together. The GL backend is immune
+	// because it executes immediately and has no recorded buffer to go stale.
+	ExecuteCommandBuffer(false);
+	return true;
+#endif
+}
+
 void GSDeviceVK::IASetVertexBuffer(const void* vertex, size_t stride, size_t count, size_t align_multiplier)
 {
 	const u32 size = static_cast<u32>(stride) * static_cast<u32>(count);
@@ -4177,8 +4376,7 @@ VkShaderModule GSDeviceVK::GetUtilityFragmentShader(const std::string& source, c
 
 bool GSDeviceVK::CreateNullTexture()
 {
-	GSTexture::Usage null_usage = m_features.rov ? GSTexture::ShaderWriteTarget : GSTexture::FeedbackTarget;
-	m_null_texture = GSTextureVK::Create(null_usage, GSTexture::Format::Color, 1, 1, 1);
+	m_null_texture = GSTextureVK::Create(GSTexture::ShaderWriteTarget, GSTexture::Format::Color, 1, 1, 1);
 	if (!m_null_texture)
 		return false;
 
@@ -6578,10 +6776,30 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 			m_pipeline_selector.ds = true;
 		}
 
-		// Keep feedback-loop state draw-local. Carrying it over can leave later draws
-		// in the previous feedback render pass/layout and cause Vulkan-only flicker.
-		// Matches sashkinbro/EmuCoreX exactly (the carry is removed globally there — no
-		// vendor-scoping, unlike my earlier reverted attempt).
+		// Everything EXCEPT Broadcom keeps feedback-loop state draw-local: carrying it over
+		// can leave later draws in the previous feedback render pass/layout and cause
+		// Vulkan-only flicker. That matches sashkinbro/EmuCoreX, which removes the carry
+		// globally. A vendor-scoped carry was tried once before and reverted — do NOT widen
+		// this past Broadcom without re-testing Adreno/Mali.
+		//
+		// Broadcom/V3D (Raspberry Pi, via the Linux arm64 build) is tile-based and pays
+		// heavily to close and reopen a tile render pass. Carrying the flags keeps the
+		// feedback_loop passed to OMSetRenderTargets equal to m_current_framebuffer_feedback_loop,
+		// so the render pass is NOT restarted for an otherwise-identical attachment set.
+		//
+		// Gated PER TARGET, not on the enclosing condition — that only requires ONE of rt/ds
+		// to match, so a draw keeping the RT but swapping the depth target would otherwise
+		// inherit a stale depth feedback layout: precisely the flicker mode described above.
+		if (IsDeviceBroadcom())
+		{
+			if (draw_rt && m_current_render_target == draw_rt)
+				pipe.feedback_loop_flags |= m_current_framebuffer_feedback_loop & FeedbackLoopFlag_ReadAndWriteRT;
+			if (draw_ds && m_current_depth_target == draw_ds)
+			{
+				pipe.feedback_loop_flags |= (m_current_framebuffer_feedback_loop &
+					(FeedbackLoopFlag_ReadAndWriteDepth | FeedbackLoopFlag_ReadDepth));
+			}
+		}
 	}
 
 	if (draw_rt && ((config.require_one_barrier && (config.IsFeedbackLoopRT(config.ps) || config.IsFeedbackLoopRT(config.alpha_second_pass.ps)))) && !m_features.texture_barrier)

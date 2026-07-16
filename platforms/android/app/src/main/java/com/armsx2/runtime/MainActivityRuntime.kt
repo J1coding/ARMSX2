@@ -319,6 +319,14 @@ open class MainActivityRuntime : ComponentActivity() {
         // Mutually exclusive with the fast-forward latch; blocked in RA hardcore.
         @Volatile var slowDownToggleActive = false
 
+        // Runtime gyro enable (issue #337), driven by the GYRO_TOGGLE / GYRO_HOLD hotkeys.
+        // Session-only by design — a mid-game silence, not a persisted preference, so it
+        // never contradicts the Gyro Mode setting the user chose. Compose state:
+        // TouchControlsOverlay's DisposableEffect keys on it and starts/stops the sensor.
+        // Stopping emits (0,0), which releases the gyro's contribution to the merged
+        // stick, so the physical stick is left driving on its own.
+        val gyroActive = mutableStateOf(true)
+
         // #254: whether the emulated USB keyboard is attached for the running
         // game (resolved Settings.usbKeyboard, cached at launch in
         // applyRendererPrefs). Read hot in dispatchKeyEvent to decide whether a
@@ -383,6 +391,22 @@ open class MainActivityRuntime : ComponentActivity() {
                 quitAfterStop = false
                 instance?.runOnUiThread { instance?.finishAndRemoveTask() }
             }
+        }
+
+        /** Close the running game the way the user asked for. When the game came from an
+         *  external frontend (ES-DE / Cocoon / Daijishō) and the opt-in is on, finish the
+         *  app so the frontend regains focus instead of dropping the user into the ARMSX2
+         *  library.
+         *
+         *  EVERY close route must come through here. The hotkeys used to inline this check
+         *  while the in-game menu's Close action called stop() directly, so the menu
+         *  silently ignored "Exit to launcher on close" and users had to bind a hotkey to
+         *  work around it. One chokepoint means the two can't drift apart again. */
+        @JvmStatic
+        fun closeGame(saveAutosave: Boolean = false) {
+            if (launchedExternally && prefs.getBoolean("ui.exitToLauncherExternal", true))
+                quitAfterStop = true
+            stop(saveAutosave = saveAutosave)
         }
 
         /** Fully exit the app (the library Exit button and hold-back gesture route
@@ -501,6 +525,18 @@ open class MainActivityRuntime : ComponentActivity() {
                     )
                 }
             }
+            // Per-game BIOS: boot with the game's chosen BIOS if it set one, else fall
+            // back to the global BIOS — so a previous game's per-game pick never sticks.
+            // The file is in the same app-private BIOS dir as the global one, so only the
+            // Filenames/BIOS *filename* changes; commit before the VM's LoadBIOS runs.
+            run {
+                val effectiveBios = resolved.biosFilename.takeIf { it.isNotBlank() }
+                    ?: bios.value?.takeIf { it.isNotEmpty() }?.let { File(it).name }
+                if (!effectiveBios.isNullOrBlank()) {
+                    NativeApp.setSetting("Filenames", "BIOS", "string", effectiveBios)
+                    NativeApp.commitSettings()
+                }
+            }
             upscale.value = resolved.upscaleFloat
             renderer.value = resolved.renderer
             NativeApp.renderUpscalemultiplier(upscale.value)
@@ -579,7 +615,17 @@ open class MainActivityRuntime : ComponentActivity() {
             // Mode 0 = Nominal (60fps cap), 3 = Unlimited.
             val limit = InGameOverlay.frameLimitOn.value
             NativeApp.setSetting("EmuCore/GS", "FrameLimitEnable", "bool", limit.toString())
-            NativeApp.speedhackLimitermode(if (limit) 0 else 3)
+            // Preserve an active fast-forward / slow-down latch across a settings apply.
+            // Otherwise this re-application of the limiter clobbers mode 1/2 back to the base
+            // limit while the toggle state stays ON — so fast-forward is "forgotten" and the
+            // user has to toggle off then on again to resync. Re-assert the latched mode.
+            NativeApp.speedhackLimitermode(
+                when {
+                    fastForwardToggleActive -> 1
+                    slowDownToggleActive -> 2
+                    else -> if (limit) 0 else 3
+                }
+            )
         }
 
         /**
@@ -604,6 +650,9 @@ open class MainActivityRuntime : ComponentActivity() {
                     "uri=${uri.take(240)} state=${eState.value} runLoop=$vmRunLoopActive " +
                     "stopping=$vmStopInProgress nativeReady=${nativeReady.value}"
             )
+            // Refresh the ANGLE EGL env before the GS thread opens the GL context, so a
+            // just-changed AndroidUseAngleOpenGL / renderer choice takes effect on this boot.
+            instance?.applicationContext?.let { applyAngleEnv(it) }
             // Native GS/settings calls in start()→applyRendererPrefs null-deref if the
             // base settings layer isn't installed yet (initialize() not finished). On a
             // cold first launch — reliably on Samsung DeX — a fast game tap races init
@@ -734,9 +783,11 @@ open class MainActivityRuntime : ComponentActivity() {
 
         fun stop(saveAutosave: Boolean = false, restartAfterStop: Boolean = false) {
             // Drop any latched fast-forward / slow-down toggle; the next game boots
-            // at normal speed.
+            // at normal speed. Same for the gyro hotkey latch — a game left with gyro
+            // toggled off must not silently start the next one with gyro dead.
             fastForwardToggleActive = false
             slowDownToggleActive = false
+            gyroActive.value = true
             val nativeActive = runCatching { NativeApp.hasActiveVM() }.getOrDefault(false)
             val shouldStop = synchronized(vmLifecycleLock) {
                 if (restartAfterStop)
@@ -789,6 +840,11 @@ open class MainActivityRuntime : ComponentActivity() {
                             WindowImpl.showLibrary.value = false
                             WindowImpl.overlayVisible.value = false
                         }
+                        // No game is running any more — clear the current-game pointer so the
+                        // Settings screen reverts to Global scope. Otherwise the last-played game
+                        // lingered here and SettingsScreen's scopeContext (game ?: currentGame)
+                        // kept surfacing per-game scope for it after returning to the library.
+                        currentGame.value = null
                         finishToLauncherIfRequested()
                     }
                 }
@@ -803,6 +859,54 @@ open class MainActivityRuntime : ComponentActivity() {
                 start()
             else
                 stop(restartAfterStop = true)
+        }
+
+        /** Open a file picker to swap the mounted disc WITHOUT rebooting the VM.
+         *  The picked URI is handed to NativeApp.changeDisc (see swapDiscAction),
+         *  which parks the CPU thread and cycles the CDVD tray so the running game
+         *  detects the new disc — needed for multi-disc titles and cheat discs
+         *  (CodeBreaker/GameShark) that hand off to a game disc. Bridges Compose
+         *  (the in-game menu) to the Activity-scoped ActivityResult launcher; the
+         *  picker + native swap were intact but had no trigger after the monorepo
+         *  UI migration, so Swap Disc silently did nothing. */
+        fun promptSwapDisc() {
+            val activity = instance ?: return
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "*/*"
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            runCatching { activity.swapDiscAction.launch(intent) }
+        }
+
+        /** ANGLE (GLES-on-Vulkan) for the OpenGL renderer. Ported from sashkinbro/EmuCoreX:
+         *  when the AndroidUseAngleOpenGL setting is on AND the renderer is OpenGL, point the
+         *  ARMSX2_ANGLE_EGL_LIBRARY / _GLES_LIBRARY env vars at the bundled ANGLE .so in the
+         *  native-lib dir; GLContextEGL::LoadEGL (native) then loads ANGLE's EGL instead of the
+         *  system GLES driver — useful where the native GLES stack is broken (e.g. some MediaTek
+         *  Mali). Cleared otherwise. Env vars are read by native getenv in this same process, so
+         *  this Kotlin call is the whole hook. MUST run before the GS thread opens the GL context,
+         *  so it's invoked at emucore init and before each game launch. Renderer restart applies a
+         *  live toggle (like the GPU-profile override). Uses the GLOBAL settings; per-game renderer
+         *  overrides are out of scope for v1. */
+        fun applyAngleEnv(context: Context) {
+            val settings = runCatching { com.armsx2.config.ConfigStore.loadGlobal() }.getOrNull()
+            val eligible = settings?.useAngleOpenGL == true && settings.renderer == "opengl"
+            val libDir = context.applicationInfo.nativeLibraryDir
+            val egl = File(libDir, "libEGL_angle.so")
+            val gles = File(libDir, "libGLESv2_angle.so")
+            try {
+                if (eligible && egl.exists() && gles.exists()) {
+                    android.system.Os.setenv("ARMSX2_ANGLE_EGL_LIBRARY", egl.absolutePath, true)
+                    android.system.Os.setenv("ARMSX2_ANGLE_GLES_LIBRARY", gles.absolutePath, true)
+                    android.util.Log.i("ARMSX2", "ANGLE OpenGL enabled: ${egl.absolutePath}")
+                } else {
+                    runCatching { android.system.Os.unsetenv("ARMSX2_ANGLE_EGL_LIBRARY") }
+                    runCatching { android.system.Os.unsetenv("ARMSX2_ANGLE_GLES_LIBRARY") }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("ARMSX2", "applyAngleEnv failed: ${e.message}")
+            }
         }
 
         // Armed per-launch in launchGame when "Auto-load last state on boot" is on;
@@ -829,9 +933,10 @@ open class MainActivityRuntime : ComponentActivity() {
         }
 
         /** Fired when the VM reaches RUNNING (from NativeApp.vmSetPaused). If the
-         *  user enabled auto-load-on-boot, restore the autosave state once. Retries
-         *  briefly because loadAutosaveState() safely no-ops until the game's CRC is
-         *  set a moment into boot; stops on first success or after ~4s. */
+         *  user enabled auto-load-on-boot, restore the autosave state once — but only
+         *  after the renderer is actually presenting frames (polls getPresentedFrameCount),
+         *  because restoring before the present loop is flowing leaves a black screen.
+         *  Polls every 250ms, giving up after ~15s if the game never starts presenting. */
         @JvmStatic
         fun onVmRunning() {
             val requestedSlot = pendingSlotLoadOnBoot
@@ -842,17 +947,35 @@ open class MainActivityRuntime : ComponentActivity() {
             val handler = android.os.Handler(android.os.Looper.getMainLooper())
             val tryLoad = object : Runnable {
                 var attempts = 0
+                var lastFrame = -1
+                var advancingPolls = 0
                 override fun run() {
                     if (vmStopInProgress || eState.value == EmuState.STOPPED) return
+                    // Wait until the renderer is actually PRESENTING frames before restoring the
+                    // state. A boot-time load that fires as soon as the disc CRC is known — before
+                    // the present loop is flowing — leaves the restored frame undisplayed (a black
+                    // screen); loading the same state manually works only because the game is
+                    // already rendering by then. The present counter can read stale-high across a
+                    // re-launch (the GS may not fully reset between games), so gate on SUSTAINED
+                    // advancement rather than an absolute value: require frames to have grown
+                    // across a few consecutive polls (~0.75s of continuous presenting). (Native
+                    // then forces one present of the restored frame so it shows immediately.)
+                    val frame = runCatching { NativeApp.getPresentedFrameCount() }.getOrDefault(0)
+                    advancingPolls = if (lastFrame in 0 until frame) advancingPolls + 1 else 0
+                    lastFrame = frame
+                    if (advancingPolls < 3) {
+                        if (++attempts < 60) handler.postDelayed(this, 250)
+                        return
+                    }
                     val loaded = runCatching {
                         if (requestedSlot != null) NativeApp.loadStateFromSlot(requestedSlot)
                         else NativeApp.loadAutosaveState()
                     }.getOrDefault(false)
-                    if (!loaded && ++attempts < 8)
-                        handler.postDelayed(this, 500)
+                    if (!loaded && ++attempts < 60)
+                        handler.postDelayed(this, 250)
                 }
             }
-            handler.postDelayed(tryLoad, 500)
+            handler.postDelayed(tryLoad, 250)
         }
 
         fun finishSetup() {
@@ -1116,12 +1239,21 @@ open class MainActivityRuntime : ComponentActivity() {
         // detected and trigger a restart instead of silently not taking effect.
         lastInitDataRoot = assetCopyRoot(applicationContext)
 
+        // #9: one-time recovery for a fresh install that reuses an old data folder — restore
+        // settings from the in-folder mirror, or seed from the folder's old PCSX2-Android.ini,
+        // BEFORE the core loads/rewrites it. No-op (guarded) for anyone already on the new UI.
+        runCatching { com.armsx2.config.ConfigStore.reconcileReusedFolder() }
+
         // Default resources — shaders, GameIndex, fonts, fullscreenui,
         // patches.zip, controller DB. assetCopyRoot resolves to the
         // user's chosen systemDir (now valid post-setup) so emucore
         // finds them at <systemDir>/resources/...
         copyAssetAll(applicationContext, "bios")
         copyAssetAll(applicationContext, "resources")
+
+        // Point the ANGLE EGL env vars at the bundled libs (or clear them) before the
+        // GS thread ever opens a GL context. Re-applied per launch below too.
+        applyAngleEnv(applicationContext)
 
         // Keep the configured BIOS in app-private internal storage (NOT under a
         // custom/SD data root). The native core can't reliably open a BIOS off a
@@ -1362,6 +1494,8 @@ open class MainActivityRuntime : ComponentActivity() {
         com.armsx2.i18n.I18n.init(applicationContext)
         applyEmulationOrientation()
         com.armsx2.CoverArtStyle.load()
+        com.armsx2.GridLabels.load()
+        com.armsx2.HiddenGames.load()
         com.armsx2.LibraryTitles.load()
         com.armsx2.LibraryRecentShelf.load()
         com.armsx2.LibraryView.load()
@@ -1425,7 +1559,9 @@ open class MainActivityRuntime : ComponentActivity() {
                 resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK !=
                     Configuration.UI_MODE_NIGHT_YES
             com.armsx2.ui.theme.ThemeMode.Light -> true
-            com.armsx2.ui.theme.ThemeMode.Dark -> false
+            com.armsx2.ui.theme.ThemeMode.Dark,
+            com.armsx2.ui.theme.ThemeMode.Black,
+            com.armsx2.ui.theme.ThemeMode.Oled -> false
         }
         WindowInsetsControllerCompat(window, window.decorView).let { controller ->
             controller.show(WindowInsetsCompat.Type.systemBars())
@@ -1483,16 +1619,21 @@ open class MainActivityRuntime : ComponentActivity() {
             androidx.compose.runtime.SideEffect {
                 window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(themedWindowBackground.toArgb()))
             }
+            // Keep the library/menu immersive (nav bar hidden, swipe-transient) just like
+            // in-game, so it doesn't sit on top of the toolbar. Bars stay visible only where
+            // reliable system UI is genuinely needed: the setup wizard, the touch-layout
+            // editor, and the unsupported-hardware error screens. (Previously `showLibrary`
+            // and plain STOPPED forced the bar on for the whole library.)
             val showSystemBars = !setupComplete.value ||
                 setupEditorVisible.value ||
-                WindowImpl.showLibrary.value ||
-                eState.value == EmuState.STOPPED ||
                 eState.value == EmuState.RENDER_UNSUPPORTED ||
                 eState.value == EmuState.EMULATOR_UNSUPPORTED
             val darkTheme = when (com.armsx2.ui.theme.ThemePreferences.mode.value) {
                 com.armsx2.ui.theme.ThemeMode.System -> androidx.compose.foundation.isSystemInDarkTheme()
                 com.armsx2.ui.theme.ThemeMode.Light -> false
-                com.armsx2.ui.theme.ThemeMode.Dark -> true
+                com.armsx2.ui.theme.ThemeMode.Dark,
+                com.armsx2.ui.theme.ThemeMode.Black,
+                com.armsx2.ui.theme.ThemeMode.Oled -> true
             }
             androidx.compose.runtime.SideEffect {
                 applySystemBarTheme(darkTheme = darkTheme, showSystemBars = showSystemBars)
@@ -1807,6 +1948,18 @@ open class MainActivityRuntime : ComponentActivity() {
                 }
             }
             return true // swallow down + up while capturing
+        }
+        // Pad-button capture (Controls screen): bind here — like the hotkey capture above —
+        // instead of via Compose's onPreviewKeyEvent, because the bind prompt is no longer a
+        // focus-stealing dialog (a Dialog window would swallow controller keys before Compose or
+        // this handler saw them — the 2.6.0 "can't remap buttons" bug). Bind the first real key
+        // press; swallow down+up so nav (B = exit, A = confirm) can't fire mid-capture.
+        val padCapture = ControllerMappings.capturePadAction.value
+        if (padCapture != null) {
+            if (kc != KeyEvent.KEYCODE_UNKNOWN && event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                padCapture(kc)
+            }
+            return true
         }
         // Pad-button capture (Pad tab): let every key fall through to Compose's
         // onPreviewKeyEvent so ANY button binds — without this the overlay nav
@@ -2180,6 +2333,19 @@ open class MainActivityRuntime : ComponentActivity() {
                     if (down && event.repeatCount == 0) InGameOverlay.toggleOsd()
                     return true
                 }
+                ControllerMappings.SysHotkey.GYRO_TOGGLE -> {
+                    if (down && event.repeatCount == 0) toggleGyro()
+                    return true
+                }
+                ControllerMappings.SysHotkey.GYRO_HOLD -> {
+                    // "Only while aiming": gyro is live only while the button is held.
+                    // Same shape as the FAST_FORWARD hold — act on both edges, ignore
+                    // auto-repeat. No toast: it would fire on every aim.
+                    if (event.action == KeyEvent.ACTION_DOWN || event.action == KeyEvent.ACTION_UP) {
+                        if (event.repeatCount == 0) gyroActive.value = down
+                    }
+                    return true
+                }
                 ControllerMappings.SysHotkey.FAST_FORWARD -> {
                     // Hold to fast-forward (Turbo), release to return to the user's
                     // current limiter mode (Nominal if frame-limit is on, else Unlimited)
@@ -2217,15 +2383,7 @@ open class MainActivityRuntime : ComponentActivity() {
                     return true
                 }
                 ControllerMappings.SysHotkey.CLOSE_GAME -> {
-                    if (down) {
-                        // If this game was launched from a frontend (ES-DE etc.) and the
-                        // user opted in, closing it returns to the frontend instead of
-                        // the ARMSX2 library.
-                        if (launchedExternally &&
-                            prefs.getBoolean("ui.exitToLauncherExternal", true))
-                            quitAfterStop = true
-                        stop()
-                    }
+                    if (down) closeGame()
                     return true
                 }
                 ControllerMappings.SysHotkey.QUIT_APP -> {
@@ -2236,15 +2394,10 @@ open class MainActivityRuntime : ComponentActivity() {
                     return true
                 }
                 ControllerMappings.SysHotkey.SAVE_AND_EXIT -> {
-                    // Write an autosave state, THEN close the game — the frontend
-                    // "exit" case (Cocoon/ES-DE) that returns to the launcher without
-                    // losing progress. Mirrors CLOSE_GAME's exit-to-launcher handling.
-                    if (down) {
-                        if (launchedExternally &&
-                            prefs.getBoolean("ui.exitToLauncherExternal", true))
-                            quitAfterStop = true
-                        stop(saveAutosave = true)
-                    }
+                    // Write an autosave state, THEN close the game — the frontend "exit"
+                    // case (Cocoon/ES-DE) that returns to the launcher without losing
+                    // progress. closeGame() applies the exit-to-launcher opt-in.
+                    if (down) closeGame(saveAutosave = true)
                     return true
                 }
                 ControllerMappings.SysHotkey.RESET_GAME -> {
@@ -2304,6 +2457,15 @@ open class MainActivityRuntime : ComponentActivity() {
      *  hotkey and the on-screen fast-forward touch button (FastForwardWidget). Restores
      *  the user's base limiter mode when turning off so it stays in sync with the
      *  frame-limit toggle. */
+    /** Flip the runtime gyro enable (issue #337). Shared by the GYRO_TOGGLE hotkey and the
+     *  edge-triggered (stick/combo) path. Only silences the sensor for this session — the
+     *  user's Gyro Mode setting is untouched, so re-enabling restores their configured mode. */
+    private fun toggleGyro() {
+        val on = !gyroActive.value
+        gyroActive.value = on
+        hotkeyToast(if (on) "Gyro ON" else "Gyro OFF")
+    }
+
     fun toggleFastForward() {
         fastForwardToggleActive = !fastForwardToggleActive
         val on = fastForwardToggleActive
@@ -2974,6 +3136,21 @@ open class MainActivityRuntime : ComponentActivity() {
     private val analogPrevSent = Array(8) { HashMap<Int, Float>() } // per unified pad slot (multitap)
     val analogKeyHeld = Array(8) { HashMap<Int, Float>() } // written by sendKeyAction; per unified pad slot
 
+    // ---- Gyro <-> physical-stick ADDITIVE combine (P1 / port 0) -----------
+    // The aim/steer gyro drives a PS2 analog stick; so does the physical stick.
+    // They used to clobber (raw setPadButton, last-writer-wins), so moving one
+    // killed the other. Instead the gyro is folded in as a SIGNED addend on top
+    // of the physical stick that shares its axis, then clamped to the unit circle
+    // by accumStickRadial — coarse stick aim + fine gyro adjust AT ONCE. Both the
+    // MotionEvent path and the sensor callback run on the main looper, so these
+    // are read/written without extra locking (volatile documents the sharing).
+    @Volatile private var gyroCombineActive = false   // gyro currently deflected
+    @Volatile private var gyroCombineLeft = false     // gyro drives left(true)/right(false) stick
+    @Volatile private var gyroVecX = 0f               // signed gyro contribution, [-1,1]
+    @Volatile private var gyroVecY = 0f
+    private val lastPhysStickX = floatArrayOf(0f, 0f) // [0]=left [1]=right, P1 physical analog
+    private val lastPhysStickY = floatArrayOf(0f, 0f)
+
     private fun accumAnalog(code: Int, v: Float) {
         if (v <= 0f) return
         val cur = analogAccum[code] ?: 0f
@@ -3031,6 +3208,35 @@ open class MainActivityRuntime : ComponentActivity() {
         if (oy > 0f) accumAnalog(aYPos, oy) else if (oy < 0f) accumAnalog(aYNeg, -oy)
     }
 
+    /** Gyro (aim mode 1 / steer mode 2) as an ADDITIVE stick contributor. Called
+     *  from the sensor callback on the main looper. [gx],[gy] are the signed,
+     *  smoothed gyro vector in [-1,1]; (0,0) on settle/stop releases it. The gyro
+     *  sums with whichever physical stick shares its axis (aim -> right, or the
+     *  user-chosen left for RE4-style games; steer -> left) so coarse stick aim
+     *  and fine gyro adjustment work together instead of clobbering each other. */
+    fun onGyroAnalog(mode: Int, gx: Float, gy: Float) {
+        gyroCombineLeft = mode == 2 ||
+            (mode == 1 && ControllerMappings.gyroAimStick() == ControllerMappings.GYRO_STICK_LEFT)
+        gyroVecX = gx; gyroVecY = gy
+        gyroCombineActive = gx != 0f || gy != 0f
+        emitCombinedSticks()
+    }
+
+    /** Re-drive BOTH P1 sticks from their last physical vector plus the gyro addend
+     *  on the target side, then flush once. Re-contributing the NON-target stick is
+     *  what stops flushAnalogAxes' release pass from dropping it when only the gyro
+     *  moved (single owner of the analog codes = the shared merge layer). flush only
+     *  writes codes whose value changed, so an unchanged stick costs nothing. */
+    private fun emitCombinedSticks() {
+        val gxL = if (gyroCombineLeft) gyroVecX else 0f
+        val gyL = if (gyroCombineLeft) gyroVecY else 0f
+        val gxR = if (gyroCombineLeft) 0f else gyroVecX
+        val gyR = if (gyroCombineLeft) 0f else gyroVecY
+        accumStickRadial(lastPhysStickX[0] + gxL, lastPhysStickY[0] + gyL, true,  111, 113, 112, 110)
+        accumStickRadial(lastPhysStickX[1] + gxR, lastPhysStickY[1] + gyR, false, 121, 123, 122, 120)
+        flushAnalogAxes(0)
+    }
+
     /** Route one physical stick's two axes to the PS2 pad per [mode]: native analog
      *  stick (default), thresholded digital D-pad / face presses, or per-direction
      *  CUSTOM binds. [leftStick] selects which stick's CUSTOM binds to read. */
@@ -3053,7 +3259,17 @@ open class MainActivityRuntime : ComponentActivity() {
             ControllerMappings.StickMode.ANALOG -> {
                 // Radial shaping into the merge layer (flushAnalogAxes writes once
                 // per event, after every contributor has been folded in).
-                accumStickRadial(vx, vy, leftStick, aXPos, aXNeg, aYPos, aYNeg)
+                // P1 (port 0): remember this stick's PHYSICAL vector and, when the
+                // gyro is driving THIS stick, sum the gyro's signed addend on top so
+                // coarse stick aim + fine gyro adjust simultaneously (onGyroAnalog).
+                // Stored value is pre-gyro so the sensor path can add gyro cleanly.
+                var sx = vx; var sy = vy
+                if (port == 0) {
+                    val si = if (leftStick) 0 else 1
+                    lastPhysStickX[si] = vx; lastPhysStickY[si] = vy
+                    if (gyroCombineActive && gyroCombineLeft == leftStick) { sx += gyroVecX; sy += gyroVecY }
+                }
+                accumStickRadial(sx, sy, leftStick, aXPos, aXNeg, aYPos, aYNeg)
                 if (leftStick && ControllerMappings.dpadAsLeftStick()) {
                     // Fold the physical D-pad (HAT) into the left stick so the
                     // D-pad drives analog movement — full deflection, unshaped
@@ -3154,23 +3370,18 @@ open class MainActivityRuntime : ComponentActivity() {
                 runCatching { NativeApp.speedhackLimitermode(if (on) 1 else baseLimiterMode()) }
                 hotkeyToast(if (on) "Fast Forward ON" else "Fast Forward OFF")
             }
+            ControllerMappings.SysHotkey.GYRO_TOGGLE -> toggleGyro()
+            // GYRO_HOLD needs key up/down edges, which this edge-triggered path (stick
+            // directions / combos) doesn't provide — behave as a toggle here rather than
+            // latching gyro on with no release.
+            ControllerMappings.SysHotkey.GYRO_HOLD -> toggleGyro()
             ControllerMappings.SysHotkey.RES_UP -> stepResolution(1)
             ControllerMappings.SysHotkey.RES_DOWN -> stepResolution(-1)
             ControllerMappings.SysHotkey.ACHIEVEMENTS -> com.armsx2.ui.emulation.EmulationMenuInputController.open(com.armsx2.ui.emulation.EmulationMenuTab.Options)
-            ControllerMappings.SysHotkey.CLOSE_GAME -> {
-                if (launchedExternally &&
-                    prefs.getBoolean("ui.exitToLauncherExternal", true))
-                    quitAfterStop = true
-                stop()
-            }
+            ControllerMappings.SysHotkey.CLOSE_GAME -> closeGame()
             ControllerMappings.SysHotkey.QUIT_APP -> { quitAfterStop = true; stop()
             }
-            ControllerMappings.SysHotkey.SAVE_AND_EXIT -> {
-                if (launchedExternally &&
-                    prefs.getBoolean("ui.exitToLauncherExternal", true))
-                    quitAfterStop = true
-                stop(saveAutosave = true)
-            }
+            ControllerMappings.SysHotkey.SAVE_AND_EXIT -> closeGame(saveAutosave = true)
             ControllerMappings.SysHotkey.RESET_GAME -> restart()
             ControllerMappings.SysHotkey.SLOW_DOWN -> toggleSlowDown()
             ControllerMappings.SysHotkey.TOGGLE_OSD -> InGameOverlay.toggleOsd()

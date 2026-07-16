@@ -42,6 +42,10 @@ class PatchManagerViewModel(application: Application) : AndroidViewModel(applica
             if (!directory.isDirectory) emptyList() else directory.walkTopDown().filter { it.isFile && it.extension.equals("pnach", true) }.toList()
         }.distinctBy { it.absolutePath }.sortedBy { it.name.lowercase() }
         state.value = state.value.copy(settings = ConfigStore.loadGlobal(), files = files)
+        // Reflect every file's on-disk enabled cheats into the native Enable list so
+        // labelled cheats apply even for imported/pre-enabled files the user never
+        // toggled in-app (see syncAllEnableLists / pushEnableList).
+        syncAllEnableLists(files)
     }
 
     fun update(transform: (Settings) -> Settings) {
@@ -64,7 +68,12 @@ class PatchManagerViewModel(application: Application) : AndroidViewModel(applica
         }.getOrDefault(false)
         if (!success) target.delete()
         state.value = if (success) state.value.copy(message = "Imported ${target.name}.") else state.value.copy(error = "Patch import failed.")
-        if (success) reloadCore()
+        if (success) {
+            // Register the imported file's enabled (labelled) cheats in the native Enable
+            // list BEFORE reloading, or the first reload skips them (see syncEnableListForFile).
+            syncEnableListForFile(target)
+            reloadCore()
+        }
         refresh()
     }
 
@@ -80,14 +89,26 @@ class PatchManagerViewModel(application: Application) : AndroidViewModel(applica
     //    tick the ones they want, then assemble + install a .pnach. --
 
     fun fetchOnline(game: GameInfo?) {
-        val serial = game?.serial?.takeIf { it.isNotBlank() }
-            ?: runCatching { NativeApp.getGameSerial() }.getOrNull()?.takeIf { it.isNotBlank() }
-        if (serial == null) {
-            state.value = state.value.copy(error = "No game serial to look up patches for. Open this from a game.")
-            return
-        }
         state.value = state.value.copy(onlineLoading = true, error = null, onlineEntries = emptyList())
         viewModelScope.launch {
+            // Serial priority: the library's (filename-derived) serial, then the running
+            // game's serial, then — for a plainly-named file whose filename yielded no
+            // serial and that isn't running — read it straight off the disc image
+            // (SYSTEM.CNF), the same probe the library scan uses. The last step is why
+            // online patches now work from the library, not only in-game: GameInfo.serial
+            // is often null there, but the disc always carries the real serial.
+            val serial = withContext(Dispatchers.IO) {
+                game?.serial?.takeIf { it.isNotBlank() }
+                    ?: runCatching { NativeApp.getGameSerial() }.getOrNull()?.takeIf { it.isNotBlank() }
+                    ?: game?.uri?.let { probeSerialFromDisc(it) }
+            }
+            if (serial == null) {
+                state.value = state.value.copy(
+                    onlineLoading = false,
+                    error = "No game serial to look up patches for. Open this from a game.",
+                )
+                return@launch
+            }
             val result = withContext(Dispatchers.IO) {
                 val crc = runCatching { NativeApp.getGameCRC() }.getOrNull()?.takeIf { it.length == 8 }
                 if (crc != null) PatchRepo.fetchForGame(serial, crc) else PatchRepo.fetchForSerial(serial)
@@ -103,6 +124,18 @@ class PatchManagerViewModel(application: Application) : AndroidViewModel(applica
             )
         }
     }
+
+    /** Read the PS2 serial straight from the disc image (SYSTEM.CNF) via the same native
+     *  probe the library scan uses — the fallback for a plainly-named file whose filename
+     *  gave no serial and which isn't the running game. getGameSerialFromFd may tag its
+     *  result "platform:serial", so strip any tag back to the bare serial. IO thread. */
+    private fun probeSerialFromDisc(uri: Uri): String? = runCatching {
+        val descriptor = getApplication<Application>().contentResolver.openFileDescriptor(uri, "r")
+            ?: return@runCatching null
+        val raw = NativeApp.getGameSerialFromFd(descriptor.detachFd())?.takeIf { it.isNotBlank() }
+            ?: return@runCatching null
+        raw.substringAfterLast(':').takeIf { it.isNotBlank() }
+    }.getOrNull()
 
     fun toggleOnline(name: String) {
         val selected = state.value.onlineSelected.toMutableSet()
@@ -133,6 +166,12 @@ class PatchManagerViewModel(application: Application) : AndroidViewModel(applica
             }
             if (ok) {
                 update { it.copy(enableCheats = true) }
+                // Freshly-installed cheats are written as labelled groups; add their names
+                // to the [Cheats] Enable list or EnablePatches skips them despite
+                // EnableCheats being on (see pushEnableList / toggleLocalCheat). Installed
+                // into the cheats folder, so the Cheats section.
+                val names = chosen.mapNotNull { it.name.takeIf(String::isNotBlank) }.distinct().toTypedArray()
+                if (names.isNotEmpty()) runCatching { NativeApp.setEnabledPatches(true, names, names) }
                 reloadCore()
                 state.value = state.value.copy(
                     message = "Installed ${chosen.size} item(s) for ${snapshot.onlineSerial}. Restart the game if it's running.",
@@ -188,14 +227,29 @@ class PatchManagerViewModel(application: Application) : AndroidViewModel(applica
             val ok = withContext(Dispatchers.IO) {
                 runCatching {
                     val file = File(path)
-                    val original = file.readText()
+                    // The parser builds each cheat's `body` from pnach.lines()+"\n" (always
+                    // LF), so a file saved with CRLF/CR line endings never matched verbatim —
+                    // that's the "unusual formatting" toggle failure. Normalize the file the
+                    // same way before locating the block, then write it back (PCSX2 reads LF).
+                    val original = file.readText().replace("\r\n", "\n").replace("\r", "\n")
                     val updated = original.replaceFirst(target.body, newBody)
-                    if (updated == original) return@runCatching false // body not found verbatim
+                    if (updated == original) return@runCatching false // body genuinely not found
                     file.writeText(updated)
                     true
                 }.getOrDefault(false)
             }
             if (ok) {
+                // PCSX2 only applies a LABELLED patch group ([Name]) whose name is in the
+                // [Cheats]/[Patches] "Enable" list (Patch.cpp::EnablePatches auto-enables
+                // ONLY unlabelled groups). Uncommenting the patch= lines alone therefore
+                // does nothing for the common case of named community cheats. Mirror this
+                // file's per-cheat enabled state into that Enable list so labelled cheats
+                // actually take effect. This enable-list write was lost in the monorepo UI
+                // migration, which kept only the body-comment rewrite — the cause of the
+                // "cheats don't work" regression. setEnabledPatches drops only THIS file's
+                // names before re-adding the enabled subset, so other games' active cheats
+                // (different names) are preserved.
+                pushEnableList(path)
                 reloadCore()
             } else {
                 // Revert both the flip and the body — the file wasn't rewritten.
@@ -238,6 +292,49 @@ class PatchManagerViewModel(application: Application) : AndroidViewModel(applica
         if (!MainActivityRuntime.nativeReady.value) return
         kotlin.concurrent.thread(name = "armsx2-patch-reload") {
             runCatching { NativeApp.reloadPatches() }
+        }
+    }
+
+    /** Mirror the currently-expanded file's per-cheat enabled state into the native
+     *  [Cheats]/[Patches] "Enable" list so LABELLED groups apply (Patch.cpp only
+     *  auto-enables unlabelled groups). Files in the cheats folder use the [Cheats]
+     *  section; patches/widescreen use [Patches]. Only this file's names are dropped
+     *  then re-added, so a different game's enabled cheats are left intact. */
+    private fun pushEnableList(path: String) {
+        if (!MainActivityRuntime.nativeReady.value) return
+        val cheatsSection = File(path).parentFile?.name == "cheats"
+        val all = state.value.localCheats.mapNotNull { it.name.takeIf(String::isNotBlank) }.distinct().toTypedArray()
+        if (all.isEmpty()) return
+        val enabled = state.value.localCheats.filter { it.enabled }
+            .mapNotNull { it.name.takeIf(String::isNotBlank) }.distinct().toTypedArray()
+        runCatching { NativeApp.setEnabledPatches(cheatsSection, all, enabled) }
+    }
+
+    /** Reflect one file's on-disk body state into the native Enable list (parses it).
+     *  Cheats folder → [Cheats] section, else [Patches]. Only this file's names are
+     *  dropped then re-added, so other games' enabled cheats are preserved. Synchronous
+     *  so callers can sequence it before reloadPatches. */
+    private fun syncEnableListForFile(file: File) {
+        if (!MainActivityRuntime.nativeReady.value) return
+        val cheatsSection = file.parentFile?.name == "cheats"
+        val parsed = runCatching {
+            PatchRepo.parseInstalled(file.readText(), file.parentFile?.name ?: "cheats").second
+        }.getOrDefault(emptyList())
+        val all = parsed.mapNotNull { it.name.takeIf(String::isNotBlank) }.distinct().toTypedArray()
+        if (all.isEmpty()) return
+        val enabled = parsed.filter { it.enabled }
+            .mapNotNull { it.name.takeIf(String::isNotBlank) }.distinct().toTypedArray()
+        runCatching { NativeApp.setEnabledPatches(cheatsSection, all, enabled) }
+    }
+
+    /** Reflect every installed file's on-disk body state into the native Enable lists
+     *  (off-thread — parses each pnach). The file body stays the persistent source of
+     *  truth; this reconciles the runtime list PCSX2 requires for labelled groups so
+     *  imported/pre-enabled cheats apply without an in-app toggle. */
+    private fun syncAllEnableLists(files: List<File>) {
+        if (!MainActivityRuntime.nativeReady.value || files.isEmpty()) return
+        kotlin.concurrent.thread(name = "armsx2-cheat-enable-sync") {
+            runCatching { for (file in files) syncEnableListForFile(file) }
         }
     }
 }

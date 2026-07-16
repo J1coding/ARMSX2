@@ -89,6 +89,29 @@ fun DriverManagerSection() {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle(str("backend.gpuDriver.label"), str("backend.gpuDriver.description"))
 
+        // Eden-style hint: the detected GPU and the best custom-driver source for it. Adreno
+        // maps to a tuned Turnip pack; other vendors (Mali/Xclipse/PowerVR) run the built-in
+        // system driver best. Probes the system GL_RENDERER once (cached).
+        val gpuModel = remember { com.armsx2.GpuInfo.rendererName() }
+        val gpuRec = remember(gpuModel) { com.armsx2.GpuInfo.recommendation(gpuModel) }
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(str("backend.driver.gpuModel"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(gpuModel ?: str("backend.driver.gpuUnknown"), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(str("backend.driver.recommended"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(gpuRec?.sourceLabel ?: str("backend.driver.recommendSystem"), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                }
+                gpuRec?.reason?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+        }
+
         DriverRow(
             controllerId = "driver.system",
             title = str("backend.driver.systemVulkan"),
@@ -196,6 +219,37 @@ fun DriverManagerSection() {
 
         if (busyId == "import") Text(str("backend.driver.installing"), color = MaterialTheme.colorScheme.onSurfaceVariant)
         message?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+    }
+}
+
+/**
+ * OpenGL "custom driver" picker — the GL analogue of the Vulkan [DriverManagerSection].
+ * The one option is ANGLE (Google's GLES-on-Vulkan translator), which fixes the OpenGL
+ * renderer on devices whose native GL driver is weak or buggy (most non-Adreno GPUs —
+ * Mali / Xclipse / PowerVR). Selecting toggles EmuCore/GS/AndroidUseAngleOpenGL; it
+ * takes effect on the next renderer init (the caller shows an Apply & Restart button).
+ * Shown in place of the Vulkan driver list when the OpenGL renderer is selected, so the
+ * driver picker always matches the chosen graphics API. Presentation only — the caller
+ * wires [useAngle]/[onSelect] to its own settings tier (global or per-game).
+ */
+@Composable
+fun AngleDriverSection(useAngle: Boolean, onSelect: (Boolean) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle(str("backend.glDriver.label"), str("backend.glDriver.description"))
+        DriverRow(
+            controllerId = "gldriver.system",
+            title = str("backend.driver.systemGl"),
+            subtitle = str("renderer.orientation.device"),
+            selected = !useAngle,
+            onClick = { onSelect(false) },
+        )
+        DriverRow(
+            controllerId = "gldriver.angle",
+            title = "ANGLE",
+            subtitle = str("backend.driver.angleSubtitle"),
+            selected = useAngle,
+            onClick = { onSelect(true) },
+        )
     }
 }
 

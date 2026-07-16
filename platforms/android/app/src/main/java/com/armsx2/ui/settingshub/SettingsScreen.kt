@@ -67,6 +67,13 @@ import com.armsx2.ui.settings.LocalSettingsScrollState
 
 private data class SettingsSection(val category: SettingsCategory, val titleKey: String, val glyph: String)
 
+/** Retains the settings page's scroll offset across close/reopen. The selected category already
+ *  persists in the view-model, so restoring this one offset returns you to where you were (esp.
+ *  useful in long lists like Fixes) instead of snapping to the top every time. */
+private object SettingsScrollMemory {
+    var lastOffset = 0
+}
+
 @Composable
 fun SettingsScreen(
     initialCategory: SettingsCategory,
@@ -81,6 +88,17 @@ fun SettingsScreen(
     // re-load()s the ViewModel, which re-hydrates settingsState/scope/serial together (no bleed).
     val scopeContext = game ?: com.armsx2.runtime.MainActivityRuntime.currentGame.value
     var scopeGame by remember(game?.uri) { mutableStateOf(game) }
+    // Launch the game whose per-game settings are on screen (the "Play" action in the top bar).
+    // Return to Home first so the settings route isn't left on the back stack behind the game.
+    val playScoped: (com.armsx2.GameInfo) -> Unit = { g ->
+        com.armsx2.navigation.UiNavigator.navigate(com.armsx2.navigation.AppRoute.Home)
+        // Match the working library cover-tap launch: a file:// game must be passed as a
+        // bare filesystem path, not "file:///…", or the native boot rejects the path and
+        // kicks straight back to the library (the flash-then-library symptom). Same
+        // conversion HomeViewModel.launch / HomeShortcuts use.
+        val launchPath = if (g.uri.scheme == "file") g.uri.path ?: g.uri.toString() else g.uri.toString()
+        com.armsx2.runtime.MainActivityRuntime.launchGame(launchPath, g)
+    }
     var showReset by remember { mutableStateOf(false) }
     // Settings-search "jump to control": holds the resolved label of the target row while the
     // freshly-switched tab composes + lays out, then selects it (highlight + scroll into view).
@@ -91,7 +109,10 @@ fun SettingsScreen(
             pendingJump = label
         }
     }
-    val screenScroll = rememberScrollState()
+    val screenScroll = rememberScrollState(initial = SettingsScrollMemory.lastOffset)
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose { SettingsScrollMemory.lastOffset = screenScroll.value }
+    }
     LaunchedEffect(initialCategory, game?.uri) { viewModel.load(initialCategory, game) }
     // When the controller focus returns to the category-chip row (the top-most
     // navigable element), snap the whole page back to the top so the title bar +
@@ -142,6 +163,15 @@ fun SettingsScreen(
                     actions = {
                         // Top-bar actions registered in the settings nav so a controller can reach them
                         // (D-pad up from the category chips, then left/right across the bar), not just touch.
+                        // Play: only in per-game scope — launches the game these settings belong to.
+                        scopeGame?.let { g ->
+                            Box(Modifier.controllerFocusable("settings.action.play", CircleShape, onConfirm = { playScoped(g) })) {
+                                RoundAction(
+                                    "▶", str("action.play"), { playScoped(g) },
+                                    glyphColor = androidx.compose.ui.graphics.Color(0xFF3DDC84),
+                                )
+                            }
+                        }
                         Box(Modifier.controllerFocusable("settings.action.search", CircleShape, onConfirm = openSearch)) {
                             RoundAction("⌕", str("action.search"), openSearch)
                         }

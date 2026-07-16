@@ -209,6 +209,25 @@ data class Settings(
      * per-primitive barrier fallback. A few proprietary Adreno drivers show stale-ROAA
      * read artifacts — turn this off in the Renderer tab if so. Applies on game restart. */
     val adrenoFbFetch: Boolean = true,
+    /** EmuCore/GS/ForceMaliFramebufferFetch — re-enable the Vulkan framebuffer-fetch
+     * (ROAA) path on MediaTek Mali / Mali-G57, where it is force-disabled because those
+     * drivers return zero/stale destination colour through ROAA (black or missing
+     * textures). Mali exposes no hardware dual-source blend, so with fetch off the HW
+     * renderer SW-blends via a per-primitive texture barrier — very slow in blend-heavy
+     * games (issue #339: Shadow of the Colossus on Dimensity 8350 + Mali-G615). This lets
+     * such a user test whether their driver is actually affected. Default OFF, and kept
+     * deliberately separate from adrenoFbFetch (which is default-ON plus a ConfigStore
+     * migration — keying off it would force fetch on for EVERY MediaTek Mali user, the
+     * exact breakage this works around). Inert on other GPUs/renderers. Applies on game
+     * restart. */
+    val forceMaliFbFetch: Boolean = false,
+    /** EmuCore/GS/AndroidUseAngleOpenGL — run the OpenGL renderer through ANGLE's
+     *  GLES-on-Vulkan translation (bundled libEGL_angle.so / libGLESv2_angle.so).
+     *  Useful on devices with a broken native GLES driver (e.g. some MediaTek Mali).
+     *  Only takes effect when the renderer is OpenGL; MainActivityRuntime.applyAngleEnv
+     *  turns it into the ARMSX2_ANGLE_EGL_LIBRARY env var that GLContextEGL reads.
+     *  Applies on game restart. Default off. */
+    val useAngleOpenGL: Boolean = false,
     /** EmuCore/GS/OverrideTextureBarriers — -1 Auto / 0 Off / 1 On. */
     val overrideTextureBarriers: Int = -1,
     /** EmuCore/GS/DisableVertexShaderExpand — force CPU vertex expansion. Renderer-init; restart to apply. */
@@ -302,6 +321,11 @@ data class Settings(
     // ---- MemoryCards ----
     val memoryCardSlot1Enabled: Boolean = true,
     val memoryCardSlot1Filename: String = "mcd001.ps2",
+    // Per-game BIOS override (e.g. an EU disc vs a US disc wanting its region's BIOS).
+    // Empty = use the global BIOS picked in the BIOS manager. Just the filename; the file
+    // lives in the app-private BIOS dir like every installed BIOS. Applied at boot in
+    // MainActivityRuntime.applyRendererPrefs (resolved per-game, with global fallback).
+    val biosFilename: String = "",
     val memoryCardSlot2Enabled: Boolean = true,
     val memoryCardSlot2Filename: String = "mcd002.ps2",
 
@@ -394,6 +418,11 @@ data class Settings(
     val shadeBoostGamma: Int = 50,
     /** EmuCore/GS/fxaa — FXAA post-process anti-aliasing. */
     val fxaa: Boolean = false,
+    /** EmuCore/GS/ShaderChainEnabled + /ShaderChainPreset — RetroArch (.slangp) shader
+     *  chain run at present via librashader, after ShadeBoost/FXAA. An empty preset means
+     *  off regardless of the flag, and it's a no-op if this build has no librashader. */
+    val shaderChainEnabled: Boolean = false,
+    val shaderChainPreset: String = "",
     /** EmuCore/GS/CASMode — GSCASMode: 0 Off / 1 Sharpen Only / 2 Sharpen + Resize. */
     val casMode: Int = 0,
     /** EmuCore/GS/CASSharpness — sharpening strength 0..100 (%). */
@@ -513,8 +542,8 @@ data class Settings(
     val triFilter: Int = -1,
     /** EmuCore/GS/MaxAnisotropy — 0 Off, else 2/4/8/16. */
     val maxAnisotropy: Int = 0,
-    /** EmuCore/GS/AndroidGpuProfileOverride — 0 Auto · 1 Mali · 2 Adreno · 3 PowerVR.
-     *  Stringified to "auto"/"mali"/"adreno"/"powervr" when written to emucore.
+    /** EmuCore/GS/AndroidGpuProfileOverride — 0 Auto · 1 Mali · 2 Adreno · 3 PowerVR · 4 Xclipse.
+     *  Stringified to "auto"/"mali"/"adreno"/"powervr"/"xclipse" when written to emucore.
      *  Picked up in GSDeviceOGL::CheckFeatures at device init; requires
      *  a renderer restart to take effect. */
     val gpuProfile: Int = 0,
@@ -719,6 +748,295 @@ data class Settings(
         NativeApp.commitSettings()
     }
 
+    /** Reverse of [applyTo]: rebuild a Settings from a parsed PCSX2-Android.ini map
+     *  (keys "Section/Key" -> raw string value). Any key absent from the map keeps this
+     *  Settings' current value (call on Settings() to default-fill). Used to recover an
+     *  existing native config when the new UI has no stored config.global (fresh install
+     *  over a reused data folder). Mirror applyTo's field->(section,key) mapping EXACTLY.
+     *
+     *  Only keys applyTo/writeGsToNative actually persist via [put] are inverted here.
+     *  Live-only pokes (fpsLimit, frameSkip, audioVolume/Muted/SwapChannels) and the
+     *  launch-time renderer/upscaleFloat helpers write no base-layer key, so those fields
+     *  keep their current value. UseMac* are legacy/forced-on (applyTo always writes
+     *  "true"), so they are forced true here to match fromJson. */
+    fun readFromIni(ini: Map<String, String>): Settings {
+        // Typed lookups: null when the key is absent (or unparseable) so callers
+        // fall back to `this.<field>` via ?:.
+        fun boolAt(key: String): Boolean? = ini[key]?.let { it == "true" || it == "1" }
+        fun intAt(key: String): Int? = ini[key]?.toIntOrNull()
+        fun floatAt(key: String): Float? = ini[key]?.toFloatOrNull()
+        fun strAt(key: String): String? = ini[key]
+
+        // EE/FPU clamp (0 None / 1 Normal / 2 Extra / 3 Full) is packed by applyTo into
+        // three cumulative bool keys (fpuOverflow>=1, fpuExtraOverflow>=2, fpuFullMode>=3).
+        val eeClamp = run {
+            val fo = boolAt("EmuCore/CPU/Recompiler/fpuOverflow")
+            val fe = boolAt("EmuCore/CPU/Recompiler/fpuExtraOverflow")
+            val ff = boolAt("EmuCore/CPU/Recompiler/fpuFullMode")
+            if (fo == null && fe == null && ff == null) this.eeClampMode
+            else if (ff == true) 3 else if (fe == true) 2 else if (fo == true) 1 else 0
+        }
+        // VU clamp (0 None / 1 Normal / 2 Extra / 3 Extra+Sign) — same packing on vu0*
+        // (applyTo writes vu0 and vu1 identically, so reading vu0 recovers the mode).
+        val vuClamp = run {
+            val o = boolAt("EmuCore/CPU/Recompiler/vu0Overflow")
+            val e = boolAt("EmuCore/CPU/Recompiler/vu0ExtraOverflow")
+            val sgn = boolAt("EmuCore/CPU/Recompiler/vu0SignOverflow")
+            if (o == null && e == null && sgn == null) this.vuClampMode
+            else if (sgn == true) 3 else if (e == true) 2 else if (o == true) 1 else 0
+        }
+
+        // renderer + upscale aren't written by applyTo's put() — the core / renderUpscalemultiplier
+        // persist them to the base layer directly — so recover them from the native keys.
+        // GSRendererType: Auto=-1, OGL=12, SW=13, VK=14.
+        val recoveredRenderer = when (intAt("EmuCore/GS/Renderer")) {
+            -1 -> "auto"
+            12 -> "opengl"
+            13 -> "software"
+            14 -> "vulkan"
+            else -> this.renderer
+        }
+
+        return this.copy(
+            // ---- Renderer + upscale (base-layer keys, not applyTo put()) ----
+            renderer = recoveredRenderer,
+            upscaleFloat = floatAt("EmuCore/GS/upscale_multiplier") ?: this.upscaleFloat,
+            // ---- EmuCore/Speedhacks ----
+            eeCycleRate = intAt("EmuCore/Speedhacks/EECycleRate") ?: this.eeCycleRate,
+            eeCycleSkip = intAt("EmuCore/Speedhacks/EECycleSkip") ?: this.eeCycleSkip,
+            eeClampMode = eeClamp,
+            vuClampMode = vuClamp,
+            mtvu = boolAt("EmuCore/Speedhacks/vuThread") ?: this.mtvu,
+            vu1Instant = boolAt("EmuCore/Speedhacks/vu1Instant") ?: this.vu1Instant,
+            vuFlagHack = boolAt("EmuCore/Speedhacks/vuFlagHack") ?: this.vuFlagHack,
+            fastCDVD = boolAt("EmuCore/Speedhacks/fastCDVD") ?: this.fastCDVD,
+            intcStat = boolAt("EmuCore/Speedhacks/IntcStat") ?: this.intcStat,
+            waitLoop = boolAt("EmuCore/Speedhacks/WaitLoop") ?: this.waitLoop,
+            vuNeonFusions = boolAt("EmuCore/Speedhacks/vuNeonFusions") ?: this.vuNeonFusions,
+            vuDeferredWrites = boolAt("EmuCore/Speedhacks/vuDeferredWrites") ?: this.vuDeferredWrites,
+            vuSkipStallSim = boolAt("EmuCore/Speedhacks/vuSkipStallSim") ?: this.vuSkipStallSim,
+            // ---- Frame limiter (nominalSpeedPercent stored as the 0.10..10.0 scalar) ----
+            frameLimitEnable = boolAt("EmuCore/GS/FrameLimitEnable") ?: this.frameLimitEnable,
+            nominalSpeedPercent = floatAt("Framerate/NominalScalar")?.let { Math.round(it * 100f) }
+                ?: this.nominalSpeedPercent,
+            // ---- Audio (SPU2/Output) — SyncMode is TimeStretch/Disabled ----
+            audioTimeStretch = strAt("SPU2/Output/SyncMode")?.let { it == "TimeStretch" } ?: this.audioTimeStretch,
+            audioBufferMs = intAt("SPU2/Output/BufferMS") ?: this.audioBufferMs,
+            audioOutputLatencyMs = intAt("SPU2/Output/OutputLatencyMS") ?: this.audioOutputLatencyMs,
+            audioFastForwardVolume = intAt("SPU2/Output/FastForwardVolume") ?: this.audioFastForwardVolume,
+            spu2NeonReverb = boolAt("SPU2/NeonReverbSIMD") ?: this.spu2NeonReverb,
+            // ---- EmuCore patches / cheats ----
+            enablePatches = boolAt("EmuCore/EnablePatches") ?: this.enablePatches,
+            enableCheats = boolAt("EmuCore/EnableCheats") ?: this.enableCheats,
+            enableWideScreenPatches = boolAt("EmuCore/EnableWideScreenPatches") ?: this.enableWideScreenPatches,
+            enableNoInterlacingPatches = boolAt("EmuCore/EnableNoInterlacingPatches") ?: this.enableNoInterlacingPatches,
+            enableFastBoot = boolAt("EmuCore/EnableFastBoot") ?: this.enableFastBoot,
+            hostFs = boolAt("EmuCore/HostFs") ?: this.hostFs,
+            enableGameFixes = boolAt("EmuCore/EnableGameFixes") ?: this.enableGameFixes,
+            // ---- EmuCore/Gamefixes ----
+            gamefixSoftwareRendererFmv = boolAt("EmuCore/Gamefixes/SoftwareRendererFMVHack") ?: this.gamefixSoftwareRendererFmv,
+            gamefixSkipMpeg = boolAt("EmuCore/Gamefixes/SkipMPEGHack") ?: this.gamefixSkipMpeg,
+            gamefixEETiming = boolAt("EmuCore/Gamefixes/EETimingHack") ?: this.gamefixEETiming,
+            gamefixInstantDma = boolAt("EmuCore/Gamefixes/InstantDMAHack") ?: this.gamefixInstantDma,
+            gamefixBlitInternalFps = boolAt("EmuCore/Gamefixes/BlitInternalFPSHack") ?: this.gamefixBlitInternalFps,
+            gamefixFpuMul = boolAt("EmuCore/Gamefixes/FpuMulHack") ?: this.gamefixFpuMul,
+            gamefixOphFlag = boolAt("EmuCore/Gamefixes/OPHFlagHack") ?: this.gamefixOphFlag,
+            gamefixGifFifo = boolAt("EmuCore/Gamefixes/GIFFIFOHack") ?: this.gamefixGifFifo,
+            gamefixDmaBusy = boolAt("EmuCore/Gamefixes/DMABusyHack") ?: this.gamefixDmaBusy,
+            gamefixVif1Stall = boolAt("EmuCore/Gamefixes/VIF1StallHack") ?: this.gamefixVif1Stall,
+            gamefixIbit = boolAt("EmuCore/Gamefixes/IbitHack") ?: this.gamefixIbit,
+            gamefixFullVu0Sync = boolAt("EmuCore/Gamefixes/FullVU0SyncHack") ?: this.gamefixFullVu0Sync,
+            gamefixVuAddSub = boolAt("EmuCore/Gamefixes/VuAddSubHack") ?: this.gamefixVuAddSub,
+            gamefixVuOverflow = boolAt("EmuCore/Gamefixes/VUOverflowHack") ?: this.gamefixVuOverflow,
+            gamefixXgkick = boolAt("EmuCore/Gamefixes/XgKickHack") ?: this.gamefixXgkick,
+            gamefixGoemonTlb = boolAt("EmuCore/Gamefixes/GoemonTlbHack") ?: this.gamefixGoemonTlb,
+            gamefixVuSync = boolAt("EmuCore/Gamefixes/VUSyncHack") ?: this.gamefixVuSync,
+            skipDuplicateFrames = boolAt("EmuCore/GS/SkipDuplicateFrames") ?: this.skipDuplicateFrames,
+            eeFpuRoundMode = intAt("EmuCore/CPU/FPU.Roundmode") ?: this.eeFpuRoundMode,
+            vu0RoundMode = intAt("EmuCore/CPU/VU0.Roundmode") ?: this.vu0RoundMode,
+            vu1RoundMode = intAt("EmuCore/CPU/VU1.Roundmode") ?: this.vu1RoundMode,
+            // ---- DEV9 — Ethernet / HDD ----
+            dev9EthEnable = boolAt("DEV9/Eth/EthEnable") ?: this.dev9EthEnable,
+            dev9EthApi = strAt("DEV9/Eth/EthApi") ?: this.dev9EthApi,
+            dev9EthDevice = strAt("DEV9/Eth/EthDevice") ?: this.dev9EthDevice,
+            dev9EthLogDhcp = boolAt("DEV9/Eth/EthLogDHCP") ?: this.dev9EthLogDhcp,
+            dev9EthLogDns = boolAt("DEV9/Eth/EthLogDNS") ?: this.dev9EthLogDns,
+            dev9InterceptDhcp = boolAt("DEV9/Eth/InterceptDHCP") ?: this.dev9InterceptDhcp,
+            dev9Ps2Ip = strAt("DEV9/Eth/PS2IP") ?: this.dev9Ps2Ip,
+            dev9Mask = strAt("DEV9/Eth/Mask") ?: this.dev9Mask,
+            dev9Gateway = strAt("DEV9/Eth/Gateway") ?: this.dev9Gateway,
+            dev9Dns1 = strAt("DEV9/Eth/DNS1") ?: this.dev9Dns1,
+            dev9Dns2 = strAt("DEV9/Eth/DNS2") ?: this.dev9Dns2,
+            dev9AutoMask = boolAt("DEV9/Eth/AutoMask") ?: this.dev9AutoMask,
+            dev9AutoGateway = boolAt("DEV9/Eth/AutoGateway") ?: this.dev9AutoGateway,
+            dev9ModeDns1 = strAt("DEV9/Eth/ModeDNS1") ?: this.dev9ModeDns1,
+            dev9ModeDns2 = strAt("DEV9/Eth/ModeDNS2") ?: this.dev9ModeDns2,
+            // Internal-DNS host overrides — Count gates Host{i} sections (Desc is ignored).
+            dev9EthHosts = run {
+                val count = intAt("DEV9/Eth/Hosts/Count") ?: return@run this.dev9EthHosts
+                (0 until count).mapNotNull { idx ->
+                    val url = ini["DEV9/Eth/Hosts/Host$idx/Url"] ?: return@mapNotNull null
+                    Dev9HostMapping(
+                        url = url,
+                        ip = (ini["DEV9/Eth/Hosts/Host$idx/Address"] ?: "0.0.0.0").ifEmpty { "0.0.0.0" },
+                        enabled = boolAt("DEV9/Eth/Hosts/Host$idx/Enabled") ?: true,
+                    )
+                }.filter { it.url.isNotBlank() }
+            },
+            dev9HddEnable = boolAt("DEV9/Hdd/HddEnable") ?: this.dev9HddEnable,
+            dev9HddFile = strAt("DEV9/Hdd/HddFile") ?: this.dev9HddFile,
+            // ---- MemoryCards ----
+            memoryCardSlot1Enabled = boolAt("MemoryCards/Slot1_Enable") ?: this.memoryCardSlot1Enabled,
+            memoryCardSlot1Filename = strAt("MemoryCards/Slot1_Filename") ?: this.memoryCardSlot1Filename,
+            memoryCardSlot2Enabled = boolAt("MemoryCards/Slot2_Enable") ?: this.memoryCardSlot2Enabled,
+            memoryCardSlot2Filename = strAt("MemoryCards/Slot2_Filename") ?: this.memoryCardSlot2Filename,
+            // ---- USB keyboard (USB1/Type = hidkbd/None) ----
+            usbKeyboard = strAt("USB1/Type")?.let { it == "hidkbd" } ?: this.usbKeyboard,
+            // ---- EmuCore/CPU/Recompiler enables ----
+            recEE = boolAt("EmuCore/CPU/Recompiler/EnableEE") ?: this.recEE,
+            recIOP = boolAt("EmuCore/CPU/Recompiler/EnableIOP") ?: this.recIOP,
+            recVU0 = boolAt("EmuCore/CPU/Recompiler/EnableVU0") ?: this.recVU0,
+            recVU1 = boolAt("EmuCore/CPU/Recompiler/EnableVU1") ?: this.recVU1,
+            enableFastmem = boolAt("EmuCore/CPU/Recompiler/EnableFastmem") ?: this.enableFastmem,
+            // Legacy/forced-on ARM64 backend flags — always "true" in the INI (mirror fromJson).
+            useMacEE = true,
+            useMacIOP = true,
+            useMacVU0 = true,
+            useMacVU1 = true,
+            vu1InlineFmacStall = boolAt("EmuCore/CPU/Recompiler/Vu1InlineFmacStall") ?: this.vu1InlineFmacStall,
+            vu1CrossBlockPState = boolAt("EmuCore/CPU/Recompiler/Vu1CrossBlockPState") ?: this.vu1CrossBlockPState,
+            vu1InlineDrainTestPipes = boolAt("EmuCore/CPU/Recompiler/Vu1InlineDrainTestPipes") ?: this.vu1InlineDrainTestPipes,
+            vu1FmacInstanceRouting = boolAt("EmuCore/CPU/Recompiler/Vu1FmacInstanceRouting") ?: this.vu1FmacInstanceRouting,
+            // ---- EmuCore/GS (writeGsToNative). Aspect/FMV/gpuProfile stored as names. ----
+            aspectRatio = when (strAt("EmuCore/GS/AspectRatio")) {
+                "Stretch" -> 0
+                "Auto 4:3/3:2" -> 1
+                "4:3" -> 2
+                "16:9" -> 3
+                "10:7" -> 4
+                else -> this.aspectRatio
+            },
+            fmvAspectRatio = when (strAt("EmuCore/GS/FMVAspectRatioSwitch")) {
+                "Off" -> 0
+                "Auto 4:3/3:2" -> 1
+                "4:3" -> 2
+                "16:9" -> 3
+                "10:7" -> 4
+                else -> this.fmvAspectRatio
+            },
+            deinterlaceMode = intAt("EmuCore/GS/deinterlace_mode") ?: this.deinterlaceMode,
+            framerateNtsc = floatAt("EmuCore/GS/FramerateNTSC") ?: this.framerateNtsc,
+            frameratePal = floatAt("EmuCore/GS/FrameratePAL") ?: this.frameratePal,
+            hwMipmap = boolAt("EmuCore/GS/hw_mipmap") ?: this.hwMipmap,
+            accurateBlendingUnit = intAt("EmuCore/GS/accurate_blending_unit") ?: this.accurateBlendingUnit,
+            textureFiltering = intAt("EmuCore/GS/filter") ?: this.textureFiltering,
+            displayBilinear = intAt("EmuCore/GS/linear_present_mode") ?: this.displayBilinear,
+            texturePreloading = intAt("EmuCore/GS/texture_preloading") ?: this.texturePreloading,
+            hardwareDownloadMode = intAt("EmuCore/GS/HWDownloadMode") ?: this.hardwareDownloadMode,
+            tvShader = intAt("EmuCore/GS/TVShader") ?: this.tvShader,
+            shadeBoost = boolAt("EmuCore/GS/ShadeBoost") ?: this.shadeBoost,
+            shadeBoostBrightness = intAt("EmuCore/GS/ShadeBoost_Brightness") ?: this.shadeBoostBrightness,
+            shadeBoostContrast = intAt("EmuCore/GS/ShadeBoost_Contrast") ?: this.shadeBoostContrast,
+            shadeBoostSaturation = intAt("EmuCore/GS/ShadeBoost_Saturation") ?: this.shadeBoostSaturation,
+            shadeBoostGamma = intAt("EmuCore/GS/ShadeBoost_Gamma") ?: this.shadeBoostGamma,
+            fxaa = boolAt("EmuCore/GS/fxaa") ?: this.fxaa,
+            shaderChainEnabled = boolAt("EmuCore/GS/ShaderChainEnabled") ?: this.shaderChainEnabled,
+            shaderChainPreset = strAt("EmuCore/GS/ShaderChainPreset") ?: this.shaderChainPreset,
+            casMode = intAt("EmuCore/GS/CASMode") ?: this.casMode,
+            casSharpness = intAt("EmuCore/GS/CASSharpness") ?: this.casSharpness,
+            loadTextureReplacements = boolAt("EmuCore/GS/LoadTextureReplacements") ?: this.loadTextureReplacements,
+            loadTextureReplacementsAsync = boolAt("EmuCore/GS/LoadTextureReplacementsAsync") ?: this.loadTextureReplacementsAsync,
+            precacheTextureReplacements = boolAt("EmuCore/GS/PrecacheTextureReplacements") ?: this.precacheTextureReplacements,
+            dumpReplaceableTextures = boolAt("EmuCore/GS/DumpReplaceableTextures") ?: this.dumpReplaceableTextures,
+            osdShowTextureReplacements = boolAt("EmuCore/GS/OsdShowTextureReplacements") ?: this.osdShowTextureReplacements,
+            osdShowFps = boolAt("EmuCore/GS/OsdShowFPS") ?: this.osdShowFps,
+            osdScale = intAt("EmuCore/GS/OsdScale") ?: this.osdScale,
+            vsyncEnable = boolAt("EmuCore/GS/VsyncEnable") ?: this.vsyncEnable,
+            osdShowVps = boolAt("EmuCore/GS/OsdShowVPS") ?: this.osdShowVps,
+            osdShowSpeed = boolAt("EmuCore/GS/OsdShowSpeed") ?: this.osdShowSpeed,
+            osdShowCpu = boolAt("EmuCore/GS/OsdShowCPU") ?: this.osdShowCpu,
+            osdShowGpu = boolAt("EmuCore/GS/OsdShowGPU") ?: this.osdShowGpu,
+            osdShowResolution = boolAt("EmuCore/GS/OsdShowResolution") ?: this.osdShowResolution,
+            osdShowGsStats = boolAt("EmuCore/GS/OsdShowGSStats") ?: this.osdShowGsStats,
+            osdShowFrameTimes = boolAt("EmuCore/GS/OsdShowFrameTimes") ?: this.osdShowFrameTimes,
+            osdShowHardwareInfo = boolAt("EmuCore/GS/OsdShowHardwareInfo") ?: this.osdShowHardwareInfo,
+            // OsdMessagesPos is an enum int (0 None / 1 TopLeft); applyTo writes 1 when shown.
+            osdShowMessages = intAt("EmuCore/GS/OsdMessagesPos")?.let { it != 0 } ?: this.osdShowMessages,
+            osdShowGpuStats = boolAt("EmuCore/GS/OsdShowGPUStats") ?: this.osdShowGpuStats,
+            osdShowVersion = boolAt("EmuCore/GS/OsdShowVersion") ?: this.osdShowVersion,
+            osdShowSettings = boolAt("EmuCore/GS/OsdShowSettings") ?: this.osdShowSettings,
+            osdShowInputs = boolAt("EmuCore/GS/OsdShowInputs") ?: this.osdShowInputs,
+            screenOffsets = boolAt("EmuCore/GS/pcrtc_offsets") ?: this.screenOffsets,
+            showOverscan = boolAt("EmuCore/GS/pcrtc_overscan") ?: this.showOverscan,
+            antiBlur = boolAt("EmuCore/GS/pcrtc_antiblur") ?: this.antiBlur,
+            disableInterlaceOffset = boolAt("EmuCore/GS/disable_interlace_offset") ?: this.disableInterlaceOffset,
+            syncToHostRefresh = boolAt("EmuCore/GS/SyncToHostRefreshRate") ?: this.syncToHostRefresh,
+            disableFramebufferFetch = boolAt("EmuCore/GS/DisableFramebufferFetch") ?: this.disableFramebufferFetch,
+            hwRov = boolAt("EmuCore/GS/HWROV") ?: this.hwRov,
+            hwAa1 = boolAt("EmuCore/GS/HWAA1") ?: this.hwAa1,
+            adrenoFbFetch = boolAt("EmuCore/GS/EnableAdrenoFramebufferFetch") ?: this.adrenoFbFetch,
+            forceMaliFbFetch = boolAt("EmuCore/GS/ForceMaliFramebufferFetch") ?: this.forceMaliFbFetch,
+            useAngleOpenGL = boolAt("EmuCore/GS/AndroidUseAngleOpenGL") ?: this.useAngleOpenGL,
+            overrideTextureBarriers = intAt("EmuCore/GS/OverrideTextureBarriers") ?: this.overrideTextureBarriers,
+            disableVertexShaderExpand = boolAt("EmuCore/GS/DisableVertexShaderExpand") ?: this.disableVertexShaderExpand,
+            useBlitSwapChain = boolAt("EmuCore/GS/UseBlitSwapChain") ?: this.useBlitSwapChain,
+            disableShaderCache = boolAt("EmuCore/GS/DisableShaderCache") ?: this.disableShaderCache,
+            hwAccurateAlphaTest = boolAt("EmuCore/GS/HWAccurateAlphaTest") ?: this.hwAccurateAlphaTest,
+            drawBuffering = boolAt("EmuCore/GS/UserHacks_DrawBuffering") ?: this.drawBuffering,
+            spinGpuReadbacks = boolAt("EmuCore/GS/HWSpinGPUForReadbacks") ?: this.spinGpuReadbacks,
+            spinCpuReadbacks = boolAt("EmuCore/GS/HWSpinCPUForReadbacks") ?: this.spinCpuReadbacks,
+            integerScaling = boolAt("EmuCore/GS/IntegerScaling") ?: this.integerScaling,
+            dithering = intAt("EmuCore/GS/dithering_ps2") ?: this.dithering,
+            vsyncQueueSize = intAt("EmuCore/GS/VsyncQueueSize") ?: this.vsyncQueueSize,
+            autoFlushSw = boolAt("EmuCore/GS/autoflush_sw") ?: this.autoFlushSw,
+            mipmapSw = boolAt("EmuCore/GS/mipmap") ?: this.mipmapSw,
+            swThreads = intAt("EmuCore/GS/extrathreads") ?: this.swThreads,
+            swThreadsHeight = intAt("EmuCore/GS/extrathreads_height") ?: this.swThreadsHeight,
+            skipDrawStart = intAt("EmuCore/GS/UserHacks_SkipDraw_Start") ?: this.skipDrawStart,
+            skipDrawEnd = intAt("EmuCore/GS/UserHacks_SkipDraw_End") ?: this.skipDrawEnd,
+            // "UserHacks" is applyTo's derived master (manualUserHacks OR any hack set);
+            // recovering it into manualUserHacks is idempotent — the individual hacks below
+            // re-derive it when re-applied, and it preserves a master-on-with-no-hacks state.
+            manualUserHacks = boolAt("EmuCore/GS/UserHacks") ?: this.manualUserHacks,
+            autoFlush = intAt("EmuCore/GS/UserHacks_AutoFlushLevel") ?: this.autoFlush,
+            halfPixelOffset = intAt("EmuCore/GS/UserHacks_HalfPixelOffset") ?: this.halfPixelOffset,
+            limit24BitDepth = intAt("EmuCore/GS/UserHacks_Limit24BitDepth") ?: this.limit24BitDepth,
+            textureInsideRt = intAt("EmuCore/GS/UserHacks_TextureInsideRt") ?: this.textureInsideRt,
+            nativeScaling = intAt("EmuCore/GS/UserHacks_native_scaling") ?: this.nativeScaling,
+            roundSprite = intAt("EmuCore/GS/UserHacks_round_sprite_offset") ?: this.roundSprite,
+            bilinearUpscale = intAt("EmuCore/GS/UserHacks_BilinearHack") ?: this.bilinearUpscale,
+            gpuTargetClut = intAt("EmuCore/GS/UserHacks_GPUTargetCLUTMode") ?: this.gpuTargetClut,
+            cpuSpriteRenderBw = intAt("EmuCore/GS/UserHacks_CPUSpriteRenderBW") ?: this.cpuSpriteRenderBw,
+            cpuSpriteRenderLevel = intAt("EmuCore/GS/UserHacks_CPUSpriteRenderLevel") ?: this.cpuSpriteRenderLevel,
+            cpuClutRender = intAt("EmuCore/GS/UserHacks_CPUCLUTRender") ?: this.cpuClutRender,
+            alignSprite = boolAt("EmuCore/GS/UserHacks_align_sprite_X") ?: this.alignSprite,
+            mergeSprite = boolAt("EmuCore/GS/UserHacks_merge_pp_sprite") ?: this.mergeSprite,
+            forceEvenSpritePosition = boolAt("EmuCore/GS/UserHacks_ForceEvenSpritePosition") ?: this.forceEvenSpritePosition,
+            unscaledPaletteDraw = boolAt("EmuCore/GS/UserHacks_NativePaletteDraw") ?: this.unscaledPaletteDraw,
+            textureOffsetX = intAt("EmuCore/GS/UserHacks_TCOffsetX") ?: this.textureOffsetX,
+            textureOffsetY = intAt("EmuCore/GS/UserHacks_TCOffsetY") ?: this.textureOffsetY,
+            gpuPaletteConversion = boolAt("EmuCore/GS/paltex") ?: this.gpuPaletteConversion,
+            cpuFramebufferConversion = boolAt("EmuCore/GS/UserHacks_CPU_FB_Conversion") ?: this.cpuFramebufferConversion,
+            readTargetsWhenClosing = boolAt("EmuCore/GS/UserHacks_ReadTCOnClose") ?: this.readTargetsWhenClosing,
+            disableDepthEmulation = boolAt("EmuCore/GS/UserHacks_DisableDepthSupport") ?: this.disableDepthEmulation,
+            disablePartialInvalidation = boolAt("EmuCore/GS/UserHacks_DisablePartialInvalidation") ?: this.disablePartialInvalidation,
+            disableSafeFeatures = boolAt("EmuCore/GS/UserHacks_Disable_Safe_Features") ?: this.disableSafeFeatures,
+            disableRenderFixes = boolAt("EmuCore/GS/UserHacks_DisableRenderFixes") ?: this.disableRenderFixes,
+            preloadFrameData = boolAt("EmuCore/GS/preload_frame_with_gs_data") ?: this.preloadFrameData,
+            estimateTextureRegion = boolAt("EmuCore/GS/UserHacks_EstimateTextureRegion") ?: this.estimateTextureRegion,
+            triFilter = intAt("EmuCore/GS/TriFilter") ?: this.triFilter,
+            maxAnisotropy = intAt("EmuCore/GS/MaxAnisotropy") ?: this.maxAnisotropy,
+            gpuProfile = when (strAt("EmuCore/GS/AndroidGpuProfileOverride")) {
+                "mali" -> 1
+                "adreno" -> 2
+                "powervr" -> 3
+                "xclipse" -> 4
+                "auto" -> 0
+                else -> this.gpuProfile
+            },
+        )
+    }
+
     /** Upstream-style per-game export (mirrors PCSX2's FullscreenUI): write only
      *  the keys that differ from [global] into the running game's
      *  gamesettings/<serial>_<CRC>.ini, so the on-disk layer is sparse and
@@ -790,6 +1108,8 @@ data class Settings(
         put("EmuCore/GS", "ShadeBoost_Saturation", "int", shadeBoostSaturation.coerceIn(1, 100).toString())
         put("EmuCore/GS", "ShadeBoost_Gamma", "int", shadeBoostGamma.coerceIn(1, 100).toString())
         put("EmuCore/GS", "fxaa", "bool", fxaa.toString())
+        put("EmuCore/GS", "ShaderChainEnabled", "bool", shaderChainEnabled.toString())
+        put("EmuCore/GS", "ShaderChainPreset", "string", shaderChainPreset)
         put("EmuCore/GS", "CASMode", "int", casMode.coerceIn(0, 2).toString())
         put("EmuCore/GS", "CASSharpness", "int", casSharpness.coerceIn(0, 100).toString())
         put("EmuCore/GS", "LoadTextureReplacements", "bool", loadTextureReplacements.toString())
@@ -823,6 +1143,11 @@ data class Settings(
         put("EmuCore/GS", "HWROV", "bool", hwRov.toString())
         put("EmuCore/GS", "HWAA1", "bool", hwAa1.toString())
         put("EmuCore/GS", "EnableAdrenoFramebufferFetch", "bool", adrenoFbFetch.toString())
+        put("EmuCore/GS", "ForceMaliFramebufferFetch", "bool", forceMaliFbFetch.toString())
+        // Parity write (native reads the ARMSX2_ANGLE_EGL_LIBRARY env var set by
+        // MainActivityRuntime.applyAngleEnv, not this key) — kept so the config file
+        // reflects the toggle.
+        put("EmuCore/GS", "AndroidUseAngleOpenGL", "bool", useAngleOpenGL.toString())
         put("EmuCore/GS", "OverrideTextureBarriers", "int", overrideTextureBarriers.coerceIn(-1, 1).toString())
         put("EmuCore/GS", "DisableVertexShaderExpand", "bool", disableVertexShaderExpand.toString())
         put("EmuCore/GS", "UseBlitSwapChain", "bool", useBlitSwapChain.toString())
@@ -879,6 +1204,7 @@ data class Settings(
             1 -> "mali"
             2 -> "adreno"
             3 -> "powervr"
+            4 -> "xclipse"
             else -> "auto"
         }
         put("EmuCore/GS", "AndroidGpuProfileOverride", "string", gpuProfileStr)
@@ -1045,6 +1371,8 @@ data class Settings(
         put("hwRov", hwRov)
         put("hwAa1", hwAa1)
         put("adrenoFbFetch", adrenoFbFetch)
+        put("forceMaliFbFetch", forceMaliFbFetch)
+        put("useAngleOpenGL", useAngleOpenGL)
         put("overrideTextureBarriers", overrideTextureBarriers)
         put("disableVertexShaderExpand", disableVertexShaderExpand)
         put("useBlitSwapChain", useBlitSwapChain)
@@ -1092,6 +1420,7 @@ data class Settings(
         put("dev9HddFile", dev9HddFile)
         put("memoryCardSlot1Enabled", memoryCardSlot1Enabled)
         put("memoryCardSlot1Filename", memoryCardSlot1Filename)
+        put("biosFilename", biosFilename)
         put("memoryCardSlot2Enabled", memoryCardSlot2Enabled)
         put("memoryCardSlot2Filename", memoryCardSlot2Filename)
         put("usbKeyboard", usbKeyboard)
@@ -1117,6 +1446,8 @@ data class Settings(
         put("shadeBoostSaturation", shadeBoostSaturation)
         put("shadeBoostGamma", shadeBoostGamma)
         put("fxaa", fxaa)
+        put("shaderChainEnabled", shaderChainEnabled)
+        put("shaderChainPreset", shaderChainPreset)
         put("casMode", casMode)
         put("casSharpness", casSharpness)
         put("loadTextureReplacements", loadTextureReplacements)
@@ -1277,6 +1608,8 @@ data class Settings(
                 hwAa1 = json.optBoolean("hwAa1", def.hwAa1),
                 hwAat = false,
                 adrenoFbFetch = json.optBoolean("adrenoFbFetch", def.adrenoFbFetch),
+                forceMaliFbFetch = json.optBoolean("forceMaliFbFetch", def.forceMaliFbFetch),
+                useAngleOpenGL = json.optBoolean("useAngleOpenGL", def.useAngleOpenGL),
                 overrideTextureBarriers = json.optInt("overrideTextureBarriers", def.overrideTextureBarriers),
                 disableVertexShaderExpand = json.optBoolean("disableVertexShaderExpand", def.disableVertexShaderExpand),
                 useBlitSwapChain = json.optBoolean("useBlitSwapChain", def.useBlitSwapChain),
@@ -1329,6 +1662,7 @@ data class Settings(
                 dev9HddFile = json.optString("dev9HddFile", def.dev9HddFile).ifEmpty { def.dev9HddFile },
                 memoryCardSlot1Enabled = json.optBoolean("memoryCardSlot1Enabled", def.memoryCardSlot1Enabled),
                 memoryCardSlot1Filename = json.optString("memoryCardSlot1Filename", def.memoryCardSlot1Filename).ifEmpty { def.memoryCardSlot1Filename },
+                biosFilename = json.optString("biosFilename", def.biosFilename),
                 memoryCardSlot2Enabled = json.optBoolean("memoryCardSlot2Enabled", def.memoryCardSlot2Enabled),
                 memoryCardSlot2Filename = json.optString("memoryCardSlot2Filename", def.memoryCardSlot2Filename).ifEmpty { def.memoryCardSlot2Filename },
                 usbKeyboard = json.optBoolean("usbKeyboard", def.usbKeyboard),
@@ -1358,6 +1692,8 @@ data class Settings(
                 shadeBoostSaturation = json.optInt("shadeBoostSaturation", def.shadeBoostSaturation),
                 shadeBoostGamma = json.optInt("shadeBoostGamma", def.shadeBoostGamma),
                 fxaa = json.optBoolean("fxaa", def.fxaa),
+                shaderChainEnabled = json.optBoolean("shaderChainEnabled", def.shaderChainEnabled),
+                shaderChainPreset = json.optString("shaderChainPreset", def.shaderChainPreset),
                 casMode = json.optInt("casMode", def.casMode),
                 casSharpness = json.optInt("casSharpness", def.casSharpness),
                 loadTextureReplacements = json.optBoolean("loadTextureReplacements", def.loadTextureReplacements),
@@ -1492,6 +1828,8 @@ data class Settings(
             if (current.hwRov != base.hwRov) j.put("hwRov", current.hwRov)
             if (current.hwAa1 != base.hwAa1) j.put("hwAa1", current.hwAa1)
             if (current.adrenoFbFetch != base.adrenoFbFetch) j.put("adrenoFbFetch", current.adrenoFbFetch)
+            if (current.forceMaliFbFetch != base.forceMaliFbFetch) j.put("forceMaliFbFetch", current.forceMaliFbFetch)
+            if (current.useAngleOpenGL != base.useAngleOpenGL) j.put("useAngleOpenGL", current.useAngleOpenGL)
             if (current.overrideTextureBarriers != base.overrideTextureBarriers) j.put("overrideTextureBarriers", current.overrideTextureBarriers)
             if (current.disableVertexShaderExpand != base.disableVertexShaderExpand) j.put("disableVertexShaderExpand", current.disableVertexShaderExpand)
             if (current.useBlitSwapChain     != base.useBlitSwapChain)     j.put("useBlitSwapChain", current.useBlitSwapChain)
@@ -1541,6 +1879,7 @@ data class Settings(
             if (current.dev9HddFile         != base.dev9HddFile)         j.put("dev9HddFile", current.dev9HddFile)
             if (current.memoryCardSlot1Enabled != base.memoryCardSlot1Enabled) j.put("memoryCardSlot1Enabled", current.memoryCardSlot1Enabled)
             if (current.memoryCardSlot1Filename != base.memoryCardSlot1Filename) j.put("memoryCardSlot1Filename", current.memoryCardSlot1Filename)
+            if (current.biosFilename != base.biosFilename) j.put("biosFilename", current.biosFilename)
             if (current.memoryCardSlot2Enabled != base.memoryCardSlot2Enabled) j.put("memoryCardSlot2Enabled", current.memoryCardSlot2Enabled)
             if (current.memoryCardSlot2Filename != base.memoryCardSlot2Filename) j.put("memoryCardSlot2Filename", current.memoryCardSlot2Filename)
             if (current.usbKeyboard         != base.usbKeyboard)         j.put("usbKeyboard", current.usbKeyboard)
@@ -1566,6 +1905,8 @@ data class Settings(
             if (current.shadeBoostSaturation != base.shadeBoostSaturation) j.put("shadeBoostSaturation", current.shadeBoostSaturation)
             if (current.shadeBoostGamma     != base.shadeBoostGamma)     j.put("shadeBoostGamma", current.shadeBoostGamma)
             if (current.fxaa                != base.fxaa)                j.put("fxaa", current.fxaa)
+            if (current.shaderChainEnabled  != base.shaderChainEnabled)  j.put("shaderChainEnabled", current.shaderChainEnabled)
+            if (current.shaderChainPreset   != base.shaderChainPreset)   j.put("shaderChainPreset", current.shaderChainPreset)
             if (current.casMode             != base.casMode)             j.put("casMode", current.casMode)
             if (current.casSharpness        != base.casSharpness)        j.put("casSharpness", current.casSharpness)
             if (current.loadTextureReplacements != base.loadTextureReplacements) j.put("loadTextureReplacements", current.loadTextureReplacements)
@@ -1691,6 +2032,8 @@ data class Settings(
             hwAa1 = if (overrides.has("hwAa1")) overrides.getBoolean("hwAa1") else base.hwAa1,
             hwAat = false,
             adrenoFbFetch = if (overrides.has("adrenoFbFetch")) overrides.getBoolean("adrenoFbFetch") else base.adrenoFbFetch,
+            forceMaliFbFetch = if (overrides.has("forceMaliFbFetch")) overrides.getBoolean("forceMaliFbFetch") else base.forceMaliFbFetch,
+            useAngleOpenGL = if (overrides.has("useAngleOpenGL")) overrides.getBoolean("useAngleOpenGL") else base.useAngleOpenGL,
             overrideTextureBarriers = if (overrides.has("overrideTextureBarriers")) overrides.getInt("overrideTextureBarriers") else base.overrideTextureBarriers,
             disableVertexShaderExpand = if (overrides.has("disableVertexShaderExpand")) overrides.getBoolean("disableVertexShaderExpand") else base.disableVertexShaderExpand,
             useBlitSwapChain = if (overrides.has("useBlitSwapChain")) overrides.getBoolean("useBlitSwapChain") else base.useBlitSwapChain,
@@ -1750,6 +2093,7 @@ data class Settings(
             dev9HddFile = if (overrides.has("dev9HddFile")) overrides.getString("dev9HddFile").ifEmpty { base.dev9HddFile } else base.dev9HddFile,
             memoryCardSlot1Enabled = if (overrides.has("memoryCardSlot1Enabled")) overrides.getBoolean("memoryCardSlot1Enabled") else base.memoryCardSlot1Enabled,
             memoryCardSlot1Filename = if (overrides.has("memoryCardSlot1Filename")) overrides.getString("memoryCardSlot1Filename").ifEmpty { base.memoryCardSlot1Filename } else base.memoryCardSlot1Filename,
+            biosFilename = if (overrides.has("biosFilename")) overrides.getString("biosFilename") else base.biosFilename,
             memoryCardSlot2Enabled = if (overrides.has("memoryCardSlot2Enabled")) overrides.getBoolean("memoryCardSlot2Enabled") else base.memoryCardSlot2Enabled,
             memoryCardSlot2Filename = if (overrides.has("memoryCardSlot2Filename")) overrides.getString("memoryCardSlot2Filename").ifEmpty { base.memoryCardSlot2Filename } else base.memoryCardSlot2Filename,
             usbKeyboard = if (overrides.has("usbKeyboard")) overrides.getBoolean("usbKeyboard") else base.usbKeyboard,
@@ -1779,6 +2123,8 @@ data class Settings(
             shadeBoostSaturation = if (overrides.has("shadeBoostSaturation")) overrides.getInt("shadeBoostSaturation") else base.shadeBoostSaturation,
             shadeBoostGamma = if (overrides.has("shadeBoostGamma")) overrides.getInt("shadeBoostGamma") else base.shadeBoostGamma,
             fxaa = if (overrides.has("fxaa")) overrides.getBoolean("fxaa") else base.fxaa,
+            shaderChainEnabled = if (overrides.has("shaderChainEnabled")) overrides.getBoolean("shaderChainEnabled") else base.shaderChainEnabled,
+            shaderChainPreset = if (overrides.has("shaderChainPreset")) overrides.getString("shaderChainPreset") else base.shaderChainPreset,
             casMode = if (overrides.has("casMode")) overrides.getInt("casMode") else base.casMode,
             casSharpness = if (overrides.has("casSharpness")) overrides.getInt("casSharpness") else base.casSharpness,
             loadTextureReplacements = if (overrides.has("loadTextureReplacements")) overrides.getBoolean("loadTextureReplacements") else base.loadTextureReplacements,

@@ -98,7 +98,8 @@ class EmulationMenuViewModel(application: Application) : AndroidViewModel(applic
             EmulationMenuTab.Session -> when (state.value.selectedAction) {
                 0 -> resume()
                 1 -> MainActivityRuntime.restart()
-                2 -> MainActivityRuntime.stop(saveAutosave = false)
+                2 -> MainActivityRuntime.promptSwapDisc()
+                3 -> MainActivityRuntime.stop(saveAutosave = false)
             }
             EmulationMenuTab.Graphics -> when (state.value.selectedAction) {
                 0 -> setRenderer("auto")
@@ -186,7 +187,10 @@ class EmulationMenuViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun setUpscale(value: Float) {
-        val normalized = value.coerceIn(1f, 8f)
+        // Allow sub-native (0.25x–0.75x, issue #207) — the in-game menu offers them via
+        // UPSCALE_OPTIONS, so don't clamp them up to Native like the old 1f floor did (that
+        // made every below-Native pick silently apply as Native). Matches the settings tab.
+        val normalized = value.coerceIn(0.25f, 8f)
         updateSettings { it.copy(upscaleFloat = normalized) }
         MainActivityRuntime.upscale.value = normalized
         NativeApp.renderUpscalemultiplier(normalized)
@@ -312,7 +316,7 @@ class EmulationMenuViewModel(application: Application) : AndroidViewModel(applic
     }
 
     private fun actionCount(tab: EmulationMenuTab): Int = when (tab) {
-        EmulationMenuTab.Session -> 3
+        EmulationMenuTab.Session -> 4
         EmulationMenuTab.Graphics -> 4
         EmulationMenuTab.Fixes -> 0
         EmulationMenuTab.Performance -> 3

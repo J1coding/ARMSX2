@@ -79,10 +79,9 @@ mark_as_advanced(CMAKE_C_FLAGS_DEVEL CMAKE_CXX_FLAGS_DEVEL CMAKE_LINKER_FLAGS_DE
 # Select the architecture
 #-------------------------------------------------------------------------------
 # Detection keys off the *target* processor (CMAKE_SYSTEM_PROCESSOR), not the
-# host, so cross-compiles (e.g. arm64 Windows built on an x64 runner via the
-# cmake-toolchain-windows-arm64.cmake toolchain file) select the right arch.
-# On native builds CMAKE_SYSTEM_PROCESSOR == CMAKE_HOST_SYSTEM_PROCESSOR, so this
-# is behavior-preserving there.
+# host, so both native and cross builds select the right arch. The spelling
+# varies by toolchain (native MSVC reports "ARM64"/"AMD64"; other toolchains use
+# lowercase "arm64"/"aarch64"), so each branch matches all the casings.
 if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64" OR "${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "amd64" OR
    "${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "AMD64" OR "${CMAKE_OSX_ARCHITECTURES}" STREQUAL "x86_64")
 	# Multi-ISA only exists on x86.
@@ -115,7 +114,8 @@ if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64" OR "${CMAKE_SYSTEM_PROCESSOR}" 
 			endif()
 		endif()
 	endif()
-elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "arm64" OR "${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64" OR
+elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "arm64" OR "${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ARM64" OR
+       "${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64" OR "${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "AARCH64" OR
        "${CMAKE_OSX_ARCHITECTURES}" STREQUAL "arm64")
 	message(STATUS "Building for ARM64.")
 	set(ARCH_ARM64 TRUE)
@@ -137,11 +137,18 @@ elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "arm64" OR "${CMAKE_SYSTEM_PROCESSOR
 		list(APPEND PCSX2_DEFS OVERRIDE_HOST_CACHE_LINE_SIZE=${HOST_CACHE_LINE_SIZE})
 	endif()
 	
-	# Windows page/cache line size seems to match x68-64 
+	# Windows page size matches x86-64 (4K).
 	if(WIN32)
 		list(APPEND PCSX2_DEFS OVERRIDE_HOST_PAGE_SIZE=0x1000)
-		# Value of std::hardware_destructive_interference_size for ARM64 on MSVC toolset 14.40.33807
-		list(APPEND PCSX2_DEFS OVERRIDE_HOST_CACHE_LINE_SIZE=64)
+		# Ship a single unified binary that is optimal on both 64- and 128-byte
+		# cache line machines. Cache line size is only used for alignas() on hot
+		# cross-thread structures to avoid false sharing, so over-aligning is a
+		# strict superset: 128-aligned data is also 64-aligned, avoiding false
+		# sharing on 64-byte hosts too, at the cost of a few padding bytes.
+		# Compiling with the smaller value (64) would instead cause real false
+		# sharing when run on a 128-byte host (e.g. Windows-on-ARM in an Apple
+		# Silicon VM), so we always target the larger line size here.
+		list(APPEND PCSX2_DEFS OVERRIDE_HOST_CACHE_LINE_SIZE=128)
 	endif()
 else()
 	message(FATAL_ERROR "Unsupported architecture: ${CMAKE_SYSTEM_PROCESSOR}")

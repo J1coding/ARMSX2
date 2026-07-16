@@ -1402,7 +1402,7 @@ public:
 		bool depth_feedback       : 1; ///< Depth feedback loops can be done with DS directly (otherwise need to copy to separate RT).  Implies `feedback_loops`.
 		bool aa1                  : 1; ///< Supports the GS AA1 feature.
 		bool rov                  : 1; ///< Supports rasterizer ordered views for both depth and color.
-		bool metalfx_spatial      : 1; ///< Supports Apple MetalFX spatial upscaling (Metal backend, macOS 13+ / iOS 16+).
+		bool metalfx_spatial      : 1; ///< Supports Apple MetalFX spatial upscaling (Metal backend, macOS 13+).
 		bool dual_source_blend    : 1; ///< Supports a second fragment output (SRC1) as a hardware blend factor.
 		bool broken_mad_deinterlace : 1; ///< Driver can't reliably preserve/read the two-bank FastMAD history target.
 		FeatureSupport()
@@ -1457,6 +1457,10 @@ protected:
 	// GPU-profile system (sashkinbro/EmuCoreX). Drives texture/target pool sizing on Android below.
 	MobileGpuIdentity m_mobile_gpu_identity;
 	MobileGsTuning m_mobile_gs_tuning;
+	// Android: true when the SoC is MediaTek (Dimensity/Helio). Hoisted from GSDeviceVK
+	// so both backends + GS.cpp Android GameDB overrides can read it. Set during device
+	// open from the resolved GPU profile.
+	bool m_is_mediatek_soc = false;
 
 	struct
 	{
@@ -1509,6 +1513,12 @@ protected:
 	virtual void DoInterlace(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, ShaderInterlace shader, Filter filter, const InterlaceConstantBuffer& cb) = 0;
 	virtual void DoFXAA(GSTexture* sTex, GSTexture* dTex) = 0;
 	virtual void DoShadeBoost(GSTexture* sTex, GSTexture* dTex, const float params[4]) = 0;
+	/// Run the librashader filter chain from sTex into dTex. Returns false when the
+	/// backend has no chain support, the preset failed to load, or the frame was
+	/// skipped — the caller then leaves m_current alone, so an unsupported backend or
+	/// a bad preset degrades to "no shader" instead of a black screen. NOT pure: only
+	/// the Vulkan/OpenGL devices override it, everything else keeps the no-op.
+	virtual bool DoApplyShaderChain(GSTexture* sTex, GSTexture* dTex) { return false; }
 
 	/// Resolves CAS shader includes for the specified source.
 	static bool GetCASShaderSource(std::string* source);
@@ -1582,6 +1592,8 @@ public:
 	__fi const MobileGsTuning& GetMobileGSTuning() const { return m_mobile_gs_tuning; }
 	__fi bool IsConstrainedMobileGPUProfile() const { return m_mobile_gs_tuning.constrained; }
 	__fi RuntimeGpuProfile GetRuntimeGPUProfile() const { return m_runtime_gpu_profile; }
+	__fi void SetMediaTekSoC(bool v) { m_is_mediatek_soc = v; }
+	__fi bool IsMediaTekSoC() const { return m_is_mediatek_soc; }
 	__fi bool IsMaliGPUProfile() const { return (m_runtime_gpu_profile == RuntimeGpuProfile::Mali); }
 	__fi bool IsAdrenoGPUProfile() const { return (m_runtime_gpu_profile == RuntimeGpuProfile::Adreno); }
 	__fi bool IsPowerVRGPUProfile() const { return (m_runtime_gpu_profile == RuntimeGpuProfile::PowerVR); }
@@ -1731,6 +1743,10 @@ public:
 	void Interlace(const GSVector2i& ds, int field, int mode, float yoffset);
 	void FXAA();
 	void ShadeBoost();
+	/// Runs the configured RetroArch (.slangp) shader chain over m_current, after
+	/// ShadeBoost/FXAA. Shared guard + target selection; the actual chain lives in
+	/// DoApplyShaderChain, which only the librashader-capable backends override.
+	void ApplyShaderChain();
 	void Resize(int width, int height);
 
 	void CAS(GSTexture*& tex, GSVector4i& src_rect, GSVector4& src_uv, const GSVector4& draw_rect, bool sharpen_only);

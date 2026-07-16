@@ -205,7 +205,16 @@ private fun MenuPage(
     modifier: Modifier,
 ) {
     val tabScrollStates = remember {
-        EmulationMenuTab.entries.associateWith { ScrollState(initial = 0) }
+        EmulationMenuTab.entries.associateWith {
+            ScrollState(initial = InGameOverlay.menuTabScroll[it.name] ?: 0)
+        }
+    }
+    // Remember each tab's scroll offset when the menu closes so reopening a tab (especially
+    // the long Fixes list) returns to where you were instead of snapping back to the top.
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose {
+            tabScrollStates.forEach { (tab, ss) -> InGameOverlay.menuTabScroll[tab.name] = ss.value }
+        }
     }
     val scrollState = tabScrollStates.getValue(state.tab)
     // Provide the pane's scroll state to the settings widgets so the Fixes pane's
@@ -286,7 +295,7 @@ private fun MenuRail(
             modifier = Modifier.padding(vertical = 2.dp).width(40.dp),
             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.34f),
         )
-        MenuRailAction("⚙", str("action.allSettings"), onAllSettings)
+        MenuRailAction("⤢", str("action.allSettings"), onAllSettings)
     }
 }
 
@@ -392,14 +401,19 @@ private fun MenuTab(tab: EmulationMenuTab, active: Boolean, onSelect: (Emulation
     }
 }
 
+// Rail tab icons. No monochrome Unicode exists for gamepad/wrench/trophy/display, so those
+// use color emoji (the bundled NotoColorEmoji renders them); Session keeps its clean text
+// glyph. Performance uses the high-voltage emoji so it reads as a yellow lightning bolt.
+// Options carries the settings gear; the full-settings shortcut below the rail divider uses
+// a distinct "open" glyph so there aren't two gears.
 private fun tabGlyph(tab: EmulationMenuTab): String = when (tab) {
     EmulationMenuTab.Session -> "☰"
-    EmulationMenuTab.Graphics -> "✣"
-    EmulationMenuTab.Fixes -> "⚙"
-    EmulationMenuTab.Performance -> "↯"
-    EmulationMenuTab.Controls -> "⌁"
-    EmulationMenuTab.Options -> "▣"
-    EmulationMenuTab.Achievements -> "★"
+    EmulationMenuTab.Graphics -> "🖥️"
+    EmulationMenuTab.Fixes -> "🔧"
+    EmulationMenuTab.Performance -> "⚡"
+    EmulationMenuTab.Controls -> "🎮"
+    EmulationMenuTab.Options -> "⚙"
+    EmulationMenuTab.Achievements -> "🏆"
 }
 
 @Composable
@@ -427,6 +441,12 @@ private fun MenuHeader(compact: Boolean, hardcore: Boolean, richPresence: String
                 if (hardcore) {
                     Spacer(Modifier.width(8.dp))
                     HardcoreBadge()
+                }
+                // File-type chip after the HC badge (ISO / CHD / …), mirroring the library
+                // list view so the pause/RA header shows the same at-a-glance file info.
+                game?.let { g ->
+                    Spacer(Modifier.width(6.dp))
+                    com.armsx2.ui.common.StatusChip(g.extension.ifBlank { g.platform.key.uppercase() })
                 }
             }
             if (!game?.serial.isNullOrBlank()) {
@@ -458,9 +478,16 @@ private fun SessionPane(state: EmulationMenuUiState, viewModel: EmulationMenuVie
     ActionGrid(
         actions = listOf(
             MenuAction(str("action.resume"), str("action.play"), "▶", Success, viewModel::resume),
+            MenuAction(
+                str("action.fastForward"),
+                if (MainActivityRuntime.fastForwardToggleActive) str("action.fastForward.on") else str("action.fastForward.detail"),
+                "⏩",
+                if (MainActivityRuntime.fastForwardToggleActive) Success else null,
+            ) { MainActivityRuntime.instance?.toggleFastForward(); viewModel.resume() },
             MenuAction(str("memcard.restart"), str("action.reset"), "↻", null, MainActivityRuntime::restart),
+            MenuAction(str("action.swapDisc"), str("action.swapDisc.detail"), "⏏", null, MainActivityRuntime::promptSwapDisc),
             MenuAction(str("action.close"), MainActivityRuntime.currentGame.value?.title.orEmpty(), "■", Danger) {
-                MainActivityRuntime.stop(false)
+                MainActivityRuntime.closeGame()
             },
         ),
         selected = state.selectedAction,
@@ -541,8 +568,13 @@ private fun GraphicsPane(state: EmulationMenuUiState, viewModel: EmulationMenuVi
     )
     // GPU driver manager (download/import/select) — Vulkan only — plus Apply &
     // Restart, since renderer + driver changes only take effect on renderer init.
+    // For OpenGL the "custom driver" is ANGLE (GLES-on-Vulkan), same picker shape.
     if (settings.renderer == "vulkan") {
         com.armsx2.ui.common.DriverManagerSection()
+    } else if (settings.renderer == "opengl") {
+        com.armsx2.ui.common.AngleDriverSection(settings.useAngleOpenGL) { on ->
+            viewModel.updateSettings { it.copy(useAngleOpenGL = on) }
+        }
     }
     CompactAction(str("backend.applyRestart"), "↻", Modifier.fillMaxWidth(), MainActivityRuntime::restart)
     HorizontalOptions(
@@ -649,6 +681,21 @@ private fun GraphicsPane(state: EmulationMenuUiState, viewModel: EmulationMenuVi
     MenuSwitchRow(str("renderer.precacheTexturePacks.label"), settings.precacheTextureReplacements) {
         viewModel.updateSettings { current -> current.copy(precacheTextureReplacements = it) }
     }
+    // RetroArch shaders, end-to-end in-game: toggle → pick a preset → download more.
+    // Same composables the Settings renderer tab renders (single definition in ui/common);
+    // only the save lambda differs. updateSettings routes through InGameOverlay.saveSettings,
+    // which persists via ConfigStore.save(scope, serial) — honouring the overlay's
+    // Global/Game scope — and live-applies with Settings.applyTo(). Identical to how every
+    // other row in this pane (shadeboost, tvShader, dithering…) saves; both GS keys ride
+    // writeGsToNative(), and the device rebuilds the chain on the next frame, so a preset
+    // change is live with no restart.
+    com.armsx2.ui.common.ShaderChainSection(
+        enabled = settings.shaderChainEnabled,
+        preset = settings.shaderChainPreset,
+        onEnabledChange = { on -> viewModel.updateSettings { it.copy(shaderChainEnabled = on) } },
+        onPresetChange = { path -> viewModel.updateSettings { it.copy(shaderChainPreset = path) } },
+    )
+    com.armsx2.ui.common.ShaderManagerSection()
 }
 
 @Composable
@@ -811,6 +858,9 @@ private fun ControlsPane(state: EmulationMenuUiState, viewModel: EmulationMenuVi
     CompactAction(str("pad.controllerMapping"), "⌁", Modifier.fillMaxWidth(), viewModel::openControlsManager)
     Spacer(Modifier.height(6.dp))
     CompactAction(str("pad.editTouchLayout"), "✥", Modifier.fillMaxWidth(), viewModel::editTouchControls)
+    // Motion / gyroscope controls in-game (mode, sensitivity, smoothing, invert). Global scope
+    // to match the rumble/multitap toggles above; the per-game scope lives in All Settings › Controls.
+    com.armsx2.ui.settings.GyroSection()
     // Macros — edit each M1-M4 button set here in-game too (physical-trigger binding stays
     // in All Settings › Controls, which hosts the key-capture listener).
     com.armsx2.ui.settings.MacrosSection()
