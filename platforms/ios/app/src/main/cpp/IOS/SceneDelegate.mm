@@ -1133,6 +1133,26 @@ static void ARMSX2StartJITKeepalive()
 }
 
 - (void)sceneDidBecomeActive:(UIScene *)scene {
+    // Under host containers (e.g. LiveContainer), the scene resolves its
+    // orientation to landscape AFTER the SDL window and its rootViewController
+    // were created during scene:willConnectTo:. The rootVC.view keeps its
+    // portrait bounds and nothing re-evaluates it, so the SwiftUI menu (pinned
+    // to rootVC.view via Auto Layout) renders in a portrait square inside a
+    // landscape window. Force rootVC.view to the window's bounds when their
+    // orientations disagree, then let Auto Layout propagate to the menu.
+    UIViewController *rootVC = s_rootVC ?: self.window.rootViewController;
+    UIWindow *win = self.window;
+    if (rootVC == nil || win == nil) return;
+
+    const CGSize winSize = win.bounds.size;
+    const CGSize vcSize = rootVC.view.bounds.size;
+    const BOOL winLandscape = (winSize.width >= winSize.height && winSize.height > 0);
+    const BOOL vcLandscape = (vcSize.width >= vcSize.height && vcSize.height > 0);
+    if (winLandscape != vcLandscape) {
+        rootVC.view.frame = win.bounds;
+        [rootVC.view setNeedsLayout];
+        [rootVC.view layoutIfNeeded];
+    }
 }
 
 - (void)sceneWillResignActive:(UIScene *)scene {
