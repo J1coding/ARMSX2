@@ -7,15 +7,16 @@ ROOT = Path(__file__).resolve().parents[4]  # repository root
 GS_CPP = ROOT / "pcsx2/GS/GS.cpp"
 
 
+def _strip_comments(source: str) -> str:
+    # Remove /* … */ block comments and // … line comments so that source-text
+    # assertions check actual code, not explanatory prose that quotes the
+    # forbidden symbols.
+    source = re.sub(r"(?s)/\*.*?\*/", "", source)
+    source = re.sub(r"(?m)//[^\n]*", "", source)
+    return source
+
+
 def _non_windows_branch_body(source: str) -> str:
-    # The non-Windows GSAllocateWrappedMemory begins after the Windows block
-    # closes with "#else" near the bottom of the Windows-only helpers and ends
-    # at the next top-level function (GSFreeWrappedMemory) or #endif.
-    match = re.search(
-        r"(?ms)^void\* GSAllocateWrappedMemory\(size_t size, size_t repeat\)\n\{(.*?)(?=^void GSFreeWrappedMemory\()",
-        source,
-    )
-    # If there are two matches (Windows + POSIX), we want the LAST one.
     matches = list(re.finditer(
         r"(?ms)^void\* GSAllocateWrappedMemory\(size_t size, size_t repeat\)\n\{(.*?)(?=^void GSFreeWrappedMemory\()",
         source,
@@ -50,7 +51,7 @@ class GSWrappedMemoryIOSShmemTests(unittest.TestCase):
     """
 
     def test_gs_allocate_wrapped_memory_does_not_call_shm_open_directly(self):
-        source = GS_CPP.read_text(encoding="utf-8")
+        source = _strip_comments(GS_CPP.read_text(encoding="utf-8"))
         body = _non_windows_branch_body(source)
         # The POSIX branch must NOT contain a bare shm_open call. The Android
         # memfd_create path is fine; we are only forbidding the POSIX shm_open
@@ -63,7 +64,7 @@ class GSWrappedMemoryIOSShmemTests(unittest.TestCase):
         )
 
     def test_gs_allocate_wrapped_memory_uses_host_sys_create_shared_memory(self):
-        source = GS_CPP.read_text(encoding="utf-8")
+        source = _strip_comments(GS_CPP.read_text(encoding="utf-8"))
         body = _non_windows_branch_body(source)
         self.assertRegex(
             body,
@@ -73,7 +74,7 @@ class GSWrappedMemoryIOSShmemTests(unittest.TestCase):
         )
 
     def test_gs_allocate_wrapped_memory_preserves_repeat_mirroring_mmap_loop(self):
-        source = GS_CPP.read_text(encoding="utf-8")
+        source = _strip_comments(GS_CPP.read_text(encoding="utf-8"))
         body = _non_windows_branch_body(source)
         # The PS2 GS memory model requires the same backing fd to be mapped
         # `repeat` times at consecutive virtual addresses. Whatever refactor
@@ -92,7 +93,7 @@ class GSWrappedMemoryIOSShmemTests(unittest.TestCase):
         )
 
     def test_gs_free_wrapped_memory_uses_host_sys_destroy_shared_memory(self):
-        source = GS_CPP.read_text(encoding="utf-8")
+        source = _strip_comments(GS_CPP.read_text(encoding="utf-8"))
         body = _non_windows_free_body(source)
         self.assertRegex(
             body,
@@ -102,7 +103,7 @@ class GSWrappedMemoryIOSShmemTests(unittest.TestCase):
         )
 
     def test_gs_allocate_wrapped_memory_logs_failure_without_abort(self):
-        source = GS_CPP.read_text(encoding="utf-8")
+        source = _strip_comments(GS_CPP.read_text(encoding="utf-8"))
         body = _non_windows_branch_body(source)
         # On allocation failure, the function must still return nullptr to the
         # caller (GSLocalMemory::GSLocalMemory) so the caller's own contract
@@ -119,6 +120,48 @@ class GSWrappedMemoryIOSShmemTests(unittest.TestCase):
             r"\b(pxFailRel|pxOnAssertFail|abort)\s*\(",
             "GSAllocateWrappedMemory must not abort the process directly; "
             "return nullptr and let GSLocalMemory::GSLocalMemory() decide.",
+        )
+
+    def test_gs_allocate_wrapped_memory_writes_fd_to_static_holder_on_success(self):
+        source = _strip_comments(GS_CPP.read_text(encoding="utf-8"))
+        body = _non_windows_branch_body(source)
+        # The CreateSharedMemory helper returns an fd encoded as void*. The
+        # POSIX branch must store that fd into s_shm_fd so the mmap loop and
+        # the matching GSFreeWrappedMemory can use it.
+        self.assertRegex(
+            body,
+            r"s_shm_fd\s*=\s*static_cast<int>\(",
+            "GSAllocateWrappedMemory POSIX branch must store the decoded fd into "
+            "s_shm_fd after HostSys::CreateSharedMemory returns.",
+        )
+
+    def test_gs_free_wrapped_memory_keeps_nullptr_invariant(self):
+        source = _strip_comments(GS_CPP.read_text(encoding="utf-8"))
+        body = _non_windows_free_body(source)
+        # GSFreeWrappedMemory must guard against s_shm_fd < 0 before doing any
+        # work, so that double-free or free-after-failed-alloc is safe.
+        self.assertRegex(
+            body,
+            r"if\s*\(\s*s_shm_fd\s*<\s*0\s*\)\s*return\s*;",
+            "GSFreeWrappedMemory POSIX branch must early-return when s_shm_fd < 0.",
+        )
+        self.assertRegex(
+            body,
+            r"s_shm_fd\s*=\s*-1\s*;",
+            "GSFreeWrappedMemory POSIX branch must reset s_shm_fd to -1 after free.",
+        )
+
+    def test_gs_allocate_wrapped_memory_uses_pid_qualified_name(self):
+        source = _strip_comments(GS_CPP.read_text(encoding="utf-8"))
+        body = _non_windows_branch_body(source)
+        # Use HostSys::GetFileMappingName so multiple ARMSX2 instances do not
+        # collide on a fixed name like "/GS.mem". This is what the rest of the
+        # codebase does (pcsx2/Memory.cpp:98).
+        self.assertRegex(
+            body,
+            r"HostSys::GetFileMappingName\s*\(",
+            "GSAllocateWrappedMemory must use HostSys::GetFileMappingName so "
+            "the shared-memory name is PID-qualified and does not collide.",
         )
 
 
