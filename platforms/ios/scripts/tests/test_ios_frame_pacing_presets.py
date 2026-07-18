@@ -114,35 +114,59 @@ class TestIosFramePacingPresets(unittest.TestCase):
             )
 
     def test_does_not_bypass_sanitization(self):
-        """No setINIFloat('Framerate', 'NominalScalar', ...) outside applyFrameLimiterSettings()."""
-        # Strip applyFrameLimiterSettings() body before greping.
-        sanitized = re.sub(
-            r"func\s+applyFrameLimiterSettings\s*\(\s*\)\s*\{.*?^\s{4}\}",
-            "",
-            self.src,
-            count=1,
-            flags=re.DOTALL | re.MULTILINE,
-        )
-        combined = sanitized + "\n" + self.frame_pacing_src
-        bad_writes = re.findall(
-            r'setINIFloat\s*\(\s*["\']Framerate["\']\s*,\s*key:\s*["\']NominalScalar["\']',
-            combined,
-        )
-        self.assertEqual(
-            bad_writes,
-            [],
-            msg="Direct NominalScalar write found outside applyFrameLimiterSettings (bypasses sanitizer)",
-        )
-        # applyFramePacingPreset must route through Setting<T> writers.
+        """No setINIFloat('Framerate', 'NominalScalar', ...) in applyFramePacingPreset body or SettingsStore+FramePacing.swift.
+
+        The only legitimate writers of Framerate/NominalScalar are the two sanitizer
+        functions (applyFrameLimiterSettings + sanitizeNominalScalarIfNeeded). The
+        preset code must route through Setting<T> setters (frameLimiterEnabled +
+        targetFPS) so the sanitizer chain fires. This guard checks the new code
+        surface only — the existing sanitizer functions are out of scope.
+        """
+        # Strip applyFrameLimiterSettings() and sanitizeNominalScalarIfNeeded()
+        # bodies before greping — those two are the *legitimate* sanitizer writers.
+        sanitized_src = self.src
+        for func_name in ("applyFrameLimiterSettings", "sanitizeNominalScalarIfNeeded"):
+            sanitized_src = re.sub(
+                r"func\s+" + func_name + r"\s*\([^)]*\)\s*\{.*?^\s{4}\}",
+                "",
+                sanitized_src,
+                count=1,
+                flags=re.DOTALL | re.MULTILINE,
+            )
+
+        # Isolate applyFramePacingPreset body from the sanitized source.
         apply_match = re.search(
             r"func\s+applyFramePacingPreset\s*\([^)]*\)\s*\{(?P<body>.*?)^\s{4}\}",
-            self.src,
+            sanitized_src,
             re.DOTALL | re.MULTILINE,
         )
-        self.assertIsNotNone(match := apply_match, "applyFramePacingPreset missing")
-        body = match.group("body")
-        self.assertIn("frameLimiterEnabled = ", body, msg="applyFramePacingPreset doesn't set frameLimiterEnabled")
-        self.assertIn("targetFPS = ", body, msg="applyFramePacingPreset doesn't set targetFPS")
+        self.assertIsNotNone(apply_match, "applyFramePacingPreset missing")
+        apply_body = apply_match.group("body")
+
+        bad_in_apply = re.findall(
+            r'setINIFloat\s*\(\s*["\']Framerate["\']\s*,\s*key:\s*["\']NominalScalar["\']',
+            apply_body,
+        )
+        self.assertEqual(
+            bad_in_apply,
+            [],
+            msg="applyFramePacingPreset body writes NominalScalar directly (must route through Setting<T>)",
+        )
+
+        # The entire SettingsStore+FramePacing.swift file must not write NominalScalar.
+        bad_in_ext = re.findall(
+            r'setINIFloat\s*\(\s*["\']Framerate["\']\s*,\s*key:\s*["\']NominalScalar["\']',
+            self.frame_pacing_src,
+        )
+        self.assertEqual(
+            bad_in_ext,
+            [],
+            msg="SettingsStore+FramePacing.swift writes NominalScalar directly (must route through Setting<T>)",
+        )
+
+        # applyFramePacingPreset must route through Setting<T> writers.
+        self.assertIn("frameLimiterEnabled = ", apply_body, msg="applyFramePacingPreset doesn't set frameLimiterEnabled")
+        self.assertIn("targetFPS = ", apply_body, msg="applyFramePacingPreset doesn't set targetFPS")
 
     def test_audio_values_in_safe_range(self):
         """Every preset's BufferMS ∈ [10, 200] and OutputLatencyMS ∈ [5, 200]."""

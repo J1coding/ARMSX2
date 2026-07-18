@@ -23,6 +23,30 @@ enum OsdPreset: Int, CaseIterable {
     }
 }
 
+/// Frame Pacing preset levels (Phase 4.1). Mirrors the OsdPreset shape so the
+/// consolidated Settings panel and the per-game tab can drive a single picker
+/// that fans out to the underlying EmuCore/GS + SPU2/Output + Framerate keys.
+/// See D-01 in 04.1-CONTEXT.md for the locked value table.
+enum FramePacingPreset: Int, CaseIterable, Identifiable {
+    case optimal = 0       // ARMSX2-tuned default for fresh installs
+    case smooth = 1        // larger queues / buffers for visual stability
+    case lowLatency = 2    // tight queues + low audio latency for input feel
+    case batterySaver = 3  // 45 fps cap + larger audio buffer
+    case custom = 4        // user-tweaked; not derived from the table
+
+    var id: Int { rawValue }
+
+    var label: String {
+        switch self {
+        case .optimal: return "Optimal"
+        case .smooth: return "Smooth"
+        case .lowLatency: return "Low Latency"
+        case .batterySaver: return "Battery Saver"
+        case .custom: return "Custom"
+        }
+    }
+}
+
 enum JITScriptProtocol: String, CaseIterable, Identifiable {
     case universal
     case legacy
@@ -95,6 +119,8 @@ final class SettingsStore {
     @ObservationIgnored private var suppressINIWrites = false
     @ObservationIgnored private var isProgrammaticOsdFlagChange = false
     @ObservationIgnored private var isAutoMarkingCustom = false
+    @ObservationIgnored private var isProgrammaticFramePacingFlagChange = false
+    @ObservationIgnored private var isAutoMarkingFramePacingCustom = false
     @ObservationIgnored private var frameLimiterDisabledForFastForward = false
     @ObservationIgnored private var graphicsApplyWorkItem: DispatchWorkItem?
     @ObservationIgnored private var visualSliderDragCount = 0
@@ -1066,6 +1092,23 @@ final class SettingsStore {
             }
         }
     }
+    // ── Frame Pacing (Phase 4.1) ── consolidated EmuCore/GS + SPU2/Output + Framerate surface.
+    var framePacingPreset: FramePacingPreset = .optimal {
+        didSet {
+            // Only an explicit user change should cascade the preset into the
+            // individual pacing keys. During a bulk reload (suppressINIWrites),
+            // skip so applyFramePacingPreset() can't overwrite restored values.
+            guard !suppressINIWrites else { return }
+            ARMSX2Bridge.setINIInt("ARMSX2iOS/FramePacing", key: "Preset", value: Int32(framePacingPreset.rawValue))
+            if framePacingPreset == .custom {
+                if !isAutoMarkingFramePacingCustom {
+                    restoreCustomFramePacing()
+                }
+            } else {
+                applyFramePacingPreset(framePacingPreset)
+            }
+        }
+    }
     let _lastActiveOsdPresetConfig = Setting<OsdPreset>(
         section: "ARMSX2iOS/UI", key: "LastActiveOsdPreset", default: .simple,
         suppressible: false,
@@ -1721,6 +1764,14 @@ final class SettingsStore {
         controllerMultitapMode = Int(ARMSX2Bridge.getINIInt("ARMSX2iOS/Gamepad", key: "MultitapMode", defaultValue: 0))
         autoOpenStikDebug = ARMSX2Bridge.getINIBool("ARMSX2iOS/JIT", key: "AutoOpenStikDebug", defaultValue: false)
         jitScriptProtocol = Self.loadedJITScriptProtocol()
+        // Phase 4.1: smart-detect Frame Pacing "Optimal" default migration (D-02).
+        // Runs once, writes ARMSX2iOS/Migrations/FramePacingOptimalDefaultV1 true
+        // unconditionally. Fresh installs on PCSX2 v1.0 defaults get .optimal +
+        // the D-01 table applied; any customized key yields .custom + preserved
+        // user values. The stored property is then read back from the INI so the
+        // post-migration value is authoritative.
+        Self.migrateFramePacingOptimalDefaultV1()
+        framePacingPreset = FramePacingPreset(rawValue: Int(ARMSX2Bridge.getINIInt("ARMSX2iOS/FramePacing", key: "Preset", defaultValue: Int32(FramePacingPreset.optimal.rawValue)))) ?? .optimal
         dev9HddEnabled = ARMSX2Bridge.getINIBool("DEV9/Hdd", key: "HddEnable", defaultValue: false)
         dev9HddFile = ARMSX2Bridge.getINIString("DEV9/Hdd", key: "HddFile", defaultValue: "DEV9hdd.raw")
         dev9EthernetEnabled = ARMSX2Bridge.getINIBool("DEV9/Eth", key: "EthEnable", defaultValue: false)
@@ -2163,6 +2214,73 @@ final class SettingsStore {
         }
         isAutoMarkingCustom = false
         snapshotCustomOsd()
+    }
+
+    /// Apply a Frame Pacing preset — writes the D-01 row through the existing
+    /// Setting<T> clamped setters. Setting frameLimiterEnabled + targetFPS
+    /// fires applyFrameLimiterSettings() (the sanitized NominalScalar path);
+    /// presets must NEVER write Framerate/NominalScalar directly (see T-4.1-01).
+    /// Internal access: the static migration in SettingsStore+FramePacing.swift
+    /// and the Reset button in FramePacingSettingsView (Plan 02) both call this.
+    func applyFramePacingPreset(_ preset: FramePacingPreset) {
+        guard preset != .custom else { return }
+        isProgrammaticFramePacingFlagChange = true
+        defer { isProgrammaticFramePacingFlagChange = false }
+        // EDGE-ordering: non-Framerate keys first, then frameLimiterEnabled,
+        // then targetFPS — so applyFrameLimiterSettings() (fired by the
+        // targetFPS didSet) sees the correct limiter flag.
+        switch preset {
+        case .optimal:
+            vsyncQueueSize = 4
+            audioOutputLatencyMs = 15
+            audioBufferMs = 50
+            syncToHostRefresh = false
+            frameLimiterEnabled = true
+            targetFPS = 60
+        case .smooth:
+            vsyncQueueSize = 8
+            audioOutputLatencyMs = 20
+            audioBufferMs = 75
+            syncToHostRefresh = false
+            frameLimiterEnabled = true
+            targetFPS = 60
+        case .lowLatency:
+            vsyncQueueSize = 2
+            audioOutputLatencyMs = 10
+            audioBufferMs = 30
+            syncToHostRefresh = false
+            frameLimiterEnabled = true
+            targetFPS = 60
+        case .batterySaver:
+            vsyncQueueSize = 8
+            audioOutputLatencyMs = 30
+            audioBufferMs = 100
+            syncToHostRefresh = false
+            frameLimiterEnabled = true
+            targetFPS = 45
+        case .custom:
+            break
+        }
+    }
+
+    /// Restores the user's individual pacing values when cycling back to .custom.
+    /// Stub for now (Phase 4.1 Plan 01); Plan 02 wires the individual-control
+    /// snapshot/restore once the Settings panel exists. No-op keeps the didSet
+    /// contract symmetric with osdPreset.
+    private func restoreCustomFramePacing() {
+        // Intentionally empty — see Plan 02.
+    }
+
+    /// Mark the preset as .custom when the user edits any individual pacing
+    /// control. Drives the UI-SPEC Q6 "You've changed individual settings."
+    /// caption in Plan 02.
+    private func markFramePacingCustom() {
+        guard !suppressINIWrites, !isProgrammaticFramePacingFlagChange else { return }
+        isAutoMarkingFramePacingCustom = true
+        if framePacingPreset != .custom {
+            framePacingPreset = .custom
+        }
+        isAutoMarkingFramePacingCustom = false
     }
 
     /// Reset emulator settings to ARMSX2 iOS defaults
