@@ -241,7 +241,10 @@ final class SettingsStore {
         }
     }
     var frameLimiterEnabled: Bool {
-        didSet { applyFrameLimiterSettings() }
+        didSet {
+            applyFrameLimiterSettings()
+            markFramePacingCustom()
+        }
     }
     var fastForwardRuntimeEnabled = false
     // clamps to 15...120
@@ -253,6 +256,7 @@ final class SettingsStore {
                 return
             }
             applyFrameLimiterSettings()
+            markFramePacingCustom()
         }
     }
     // clamps to 1.25...10.0
@@ -296,6 +300,7 @@ final class SettingsStore {
         guard !(_audioBufferMsConfig.suppressible && suppressINIWrites) else { return }
         _audioBufferMsConfig.writer(_audioBufferMsConfig.section, _audioBufferMsConfig.key, audioBufferMs)
         _audioBufferMsConfig.onSet?(audioBufferMs)
+        markFramePacingCustom()
     }}
     let _audioOutputLatencyMsConfig = Setting<Int>(
         section: "SPU2/Output", key: "OutputLatencyMS", default: 20,
@@ -304,6 +309,7 @@ final class SettingsStore {
         guard !(_audioOutputLatencyMsConfig.suppressible && suppressINIWrites) else { return }
         _audioOutputLatencyMsConfig.writer(_audioOutputLatencyMsConfig.section, _audioOutputLatencyMsConfig.key, audioOutputLatencyMs)
         _audioOutputLatencyMsConfig.onSet?(audioOutputLatencyMs)
+        markFramePacingCustom()
     }}
     let _audioFastForwardVolumeConfig = Setting<Int>(
         section: "SPU2/Output", key: "FastForwardVolume", default: 100,
@@ -528,6 +534,7 @@ final class SettingsStore {
         guard !(_vsyncQueueSizeConfig.suppressible && suppressINIWrites) else { return }
         _vsyncQueueSizeConfig.writer(_vsyncQueueSizeConfig.section, _vsyncQueueSizeConfig.key, vsyncQueueSize)
         _vsyncQueueSizeConfig.onSet?(vsyncQueueSize)
+        markFramePacingCustom()
     }}
     let _textureFilteringConfig = Setting<Int>(
         section: "EmuCore/GS", key: "filter", default: 2,
@@ -1004,6 +1011,7 @@ final class SettingsStore {
         guard !(_syncToHostRefreshConfig.suppressible && suppressINIWrites) else { return }
         _syncToHostRefreshConfig.writer(_syncToHostRefreshConfig.section, _syncToHostRefreshConfig.key, syncToHostRefresh)
         _syncToHostRefreshConfig.onSet?(syncToHostRefresh)
+        markFramePacingCustom()
     }}
     let _integerScalingConfig = Setting<Bool>(
         section: "EmuCore/GS", key: "IntegerScaling", default: false,
