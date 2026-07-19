@@ -1109,6 +1109,20 @@ final class SettingsStore {
             }
         }
     }
+    // ── Adaptive Resolution (Phase 4.1 Plan 06, Item 9) ── opt-in frame-time
+    // driven dynamic internal resolution. Default false (Q3 LOCKED caption:
+    // "Off by default"). The didSet writes the INI key AND starts/stops the
+    // controller so the lifecycle tracks the user's toggle.
+    let _adaptiveResolutionEnabledConfig = Setting<Bool>(
+        section: "ARMSX2iOS/FramePacing", key: "DynamicResolution", default: false,
+        suppressible: false,
+        writer: { s, k, v in ARMSX2Bridge.setINIBool(s, key: k, value: v) })
+    var adaptiveResolutionEnabled: Bool = false { didSet {
+        guard !(_adaptiveResolutionEnabledConfig.suppressible && suppressINIWrites) else { return }
+        _adaptiveResolutionEnabledConfig.writer(_adaptiveResolutionEnabledConfig.section, _adaptiveResolutionEnabledConfig.key, adaptiveResolutionEnabled)
+        _adaptiveResolutionEnabledConfig.onSet?(adaptiveResolutionEnabled)
+        FrameTimeDynamicResolutionController.shared.setEnabled(adaptiveResolutionEnabled)
+    }}
     let _lastActiveOsdPresetConfig = Setting<OsdPreset>(
         section: "ARMSX2iOS/UI", key: "LastActiveOsdPreset", default: .simple,
         suppressible: false,
@@ -1772,6 +1786,14 @@ final class SettingsStore {
         // post-migration value is authoritative.
         Self.migrateFramePacingOptimalDefaultV1()
         framePacingPreset = FramePacingPreset(rawValue: Int(ARMSX2Bridge.getINIInt("ARMSX2iOS/FramePacing", key: "Preset", defaultValue: Int32(FramePacingPreset.optimal.rawValue)))) ?? .optimal
+        // Phase 4.1 Plan 06 (Item 9): Adaptive Resolution opt-in. The INI value
+        // is read back here so a persisted ON state at app boot starts the
+        // controller. The didSet is suppressINIWrites-guarded so reassigning
+        // here during init does NOT write back to the INI; we explicitly call
+        // setEnabled after the reassignment so the controller lifecycle matches
+        // the persisted value.
+        adaptiveResolutionEnabled = ARMSX2Bridge.getINIBool("ARMSX2iOS/FramePacing", key: "DynamicResolution", defaultValue: false)
+        FrameTimeDynamicResolutionController.shared.setEnabled(adaptiveResolutionEnabled)
         dev9HddEnabled = ARMSX2Bridge.getINIBool("DEV9/Hdd", key: "HddEnable", defaultValue: false)
         dev9HddFile = ARMSX2Bridge.getINIString("DEV9/Hdd", key: "HddFile", defaultValue: "DEV9hdd.raw")
         dev9EthernetEnabled = ARMSX2Bridge.getINIBool("DEV9/Eth", key: "EthEnable", defaultValue: false)
