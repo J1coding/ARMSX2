@@ -49,6 +49,30 @@ struct FramePacingSettingsView: View {
                 Text(settings.localized("Individual Settings"))
             }
 
+            // Adaptive Resolution (Item 9) — opt-in dynamic internal resolution
+            // driven by frame-time history. The controller lives in
+            // FrameTimeDynamicResolutionController.swift (Plan 06 Task 1). The
+            // Toggle binds to $settings.adaptiveResolutionEnabled whose didSet
+            // writes the INI key AND starts/stops the controller. Per-game
+            // override surfaces on PerGame/FramePacingTab.swift (Plan 03).
+            Section {
+                Toggle(settings.localized("Adaptive Resolution"), isOn: $settings.adaptiveResolutionEnabled)
+
+                Text(settings.localized("Lowers internal resolution when frame time spikes, then raises it when things settle. Useful for heavy games; can flicker briefly on step changes. Off by default."))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if settings.adaptiveResolutionEnabled {
+                    Text(settings.localized("Some games object to mid-session resolution changes. Turn this off if you see flicker or texture glitches."))
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } header: {
+                Text(settings.localized("Adaptive Resolution"))
+            }
+
             Section {
                 Button(role: .destructive) {
                     showResetConfirmation = true
