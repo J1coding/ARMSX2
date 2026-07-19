@@ -13,7 +13,7 @@ struct PerGameSettingsPanel: View {
     @State private var skinLibrary = VPadSkinLibraryStore.shared
 
     private enum PerGameSettingsCategory: CaseIterable, Identifiable {
-        case general, graphics, audio, cpu, pad, fixes, cheats, retroAchievements
+        case general, graphics, framePacing, audio, cpu, pad, fixes, cheats, retroAchievements
 
         var id: Self { self }
 
@@ -21,6 +21,7 @@ struct PerGameSettingsPanel: View {
             switch self {
             case .general: return "General"
             case .graphics: return "Graphics"
+            case .framePacing: return "Frame Pacing"
             case .audio: return "Audio"
             case .cpu: return "CPU & Speedhacks"
             case .pad: return "Virtual Pad"
@@ -34,6 +35,7 @@ struct PerGameSettingsPanel: View {
             switch self {
             case .general: return "slider.horizontal.3"
             case .graphics: return "paintbrush"
+            case .framePacing: return "speedometer"
             case .audio: return "speaker.wave.2"
             case .cpu: return "cpu"
             case .pad: return "gamecontroller"
@@ -147,10 +149,15 @@ struct PerGameSettingsPanel: View {
     @State private var perGameSyncToHostRefresh: Int
     @State private var perGameBufferMS: Int
     @State private var perGameOutputLatencyMS: Int
+    // Frame Pacing per-game overrides (-1 = use global). Preset raw value is 0..4
+    // (FramePacingPreset.rawValue). AdaptiveResolution is a Bool-encoded Int (-1/0/1).
+    @State private var perGameFramePacingPreset: Int
+    @State private var perGameAdaptiveResolution: Int
     @State private var statusMessage: String?
     @State private var showCheatsManager = false
     @State private var showResetAllConfirmation = false
     @State private var showDiscardConfirmation = false
+    @State private var showFramePacingResetConfirmation = false
     @State private var savedFingerprint: String = ""
     @State private var landscapeCategory: PerGameSettingsCategory = .general
     @State private var raEnabledOverride: Int
@@ -314,6 +321,8 @@ struct PerGameSettingsPanel: View {
         _perGameSyncToHostRefresh = State(initialValue: Self.loadedPerGameBool("EmuCore/GS", "SyncToHostRefreshRate", useCurrent: useCurrent, iso: perGameISO))
         _perGameBufferMS = State(initialValue: Self.loadedPerGameInt("SPU2/Output", "BufferMS", globalDefault: 50, useCurrent: useCurrent, iso: perGameISO))
         _perGameOutputLatencyMS = State(initialValue: Self.loadedPerGameInt("SPU2/Output", "OutputLatencyMS", globalDefault: 20, useCurrent: useCurrent, iso: perGameISO))
+        _perGameFramePacingPreset = State(initialValue: Self.loadedPerGameInt("ARMSX2iOS/FramePacing", "Preset", globalDefault: Int32(settings.framePacingPreset.rawValue), useCurrent: useCurrent, iso: perGameISO))
+        _perGameAdaptiveResolution = State(initialValue: Self.loadedPerGameBool("ARMSX2iOS/FramePacing", "DynamicResolution", useCurrent: useCurrent, iso: perGameISO))
         _raEnabledOverride = State(initialValue: Self.loadedPerGameBool("Achievements", "Enabled", useCurrent: useCurrent, iso: perGameISO))
         _raHardcoreOverride = State(initialValue: Self.loadedPerGameBool("Achievements", "ChallengeMode", useCurrent: useCurrent, iso: perGameISO))
         _savedFingerprint = State(initialValue: perGameFingerprint())
@@ -322,7 +331,7 @@ struct PerGameSettingsPanel: View {
     /// Encodes the current editable per-game state so Save can be gated on real changes.
     private func perGameFingerprint() -> String {
         let fixes = SettingsStore.gameFixOptions.map { "\($0.key):\(perGameFixes[$0.key] ?? -1)" }.joined(separator: ",")
-        return "\(enabled)|\(upscaleMultiplier)|\(aspectRatio)|\(textureFiltering)|\(hardwareMipmapping)|\(blendingAccuracy)|\(interlaceMode)|\(trilinearFiltering)|\(halfPixelOffset)|\(roundSprite)|\(alignSpriteOverride)|\(alignSprite)|\(mergeSpriteOverride)|\(mergeSprite)|\(wildArmsOffsetOverride)|\(wildArmsOffset)|\(textureOffsetXOverride)|\(textureOffsetX)|\(textureOffsetYOverride)|\(textureOffsetY)|\(skipDrawStartOverride)|\(skipDrawStart)|\(skipDrawEndOverride)|\(skipDrawEnd)|\(volumeOverride)|\(volumePercent)|\(eeCoreType)|\(mtvu)|\(eeCycleRate)|\(eeCycleSkip)|\(fastBoot)|\(enableCheats)|\(enablePatches)|\(enableGameFixes)|\(enableGameDBHardwareFixes)|\(perGameAAT)|\(perGameTextureInsideRt)|\(perGameRenderer)|\(perGameFXAA)|\(perGameUpscaler)|\(perGameShadeBoost)|\(perGameTVShader)|\(perGameCASMode)|\(perGameMaxAnisotropy)|\(perGameCASSharpness)|\(perGamePCRTCOffsets)|\(perGameIntegerScaling)|\(perGameSkipDupFrames)|\(perGamePCRTCOverscan)|\(perGamePCRTCAntiBlur)|\(perGameDisableInterlaceOffset)|\(perGameWidescreen)|\(perGameNoInterlace)|\(perGameShadeBoostBrightness)|\(perGameShadeBoostContrast)|\(perGameShadeBoostSaturation)|\(perGameShadeBoostGamma)|\(perGameDithering)|\(perGameFastForwardVolume)|\(perGameIOP)|\(perGameVU0)|\(perGameVU1)|\(perGameHWDownloadMode)|\(perGameCPUCLUT)|\(perGameGPUTargetCLUT)|\(perGameVsyncQueue)|\(perGameLoadTextureReplacements)|\(perGameLoadTextureReplacementsAsync)|\(perGamePrecacheTextureReplacements)|\(perGameSyncToHostRefresh)|\(perGameBufferMS)|\(perGameOutputLatencyMS)|\(perGameEEFpuRound)|\(perGameVU0Round)|\(perGameVU1Round)|\(perGameEEClamp)|\(perGameVUClamp)|\(raEnabledOverride)|\(raHardcoreOverride)|\(fixes)"
+        return "\(enabled)|\(upscaleMultiplier)|\(aspectRatio)|\(textureFiltering)|\(hardwareMipmapping)|\(blendingAccuracy)|\(interlaceMode)|\(trilinearFiltering)|\(halfPixelOffset)|\(roundSprite)|\(alignSpriteOverride)|\(alignSprite)|\(mergeSpriteOverride)|\(mergeSprite)|\(wildArmsOffsetOverride)|\(wildArmsOffset)|\(textureOffsetXOverride)|\(textureOffsetX)|\(textureOffsetYOverride)|\(textureOffsetY)|\(skipDrawStartOverride)|\(skipDrawStart)|\(skipDrawEndOverride)|\(skipDrawEnd)|\(volumeOverride)|\(volumePercent)|\(eeCoreType)|\(mtvu)|\(eeCycleRate)|\(eeCycleSkip)|\(fastBoot)|\(enableCheats)|\(enablePatches)|\(enableGameFixes)|\(enableGameDBHardwareFixes)|\(perGameAAT)|\(perGameTextureInsideRt)|\(perGameRenderer)|\(perGameFXAA)|\(perGameUpscaler)|\(perGameShadeBoost)|\(perGameTVShader)|\(perGameCASMode)|\(perGameMaxAnisotropy)|\(perGameCASSharpness)|\(perGamePCRTCOffsets)|\(perGameIntegerScaling)|\(perGameSkipDupFrames)|\(perGamePCRTCOverscan)|\(perGamePCRTCAntiBlur)|\(perGameDisableInterlaceOffset)|\(perGameWidescreen)|\(perGameNoInterlace)|\(perGameShadeBoostBrightness)|\(perGameShadeBoostContrast)|\(perGameShadeBoostSaturation)|\(perGameShadeBoostGamma)|\(perGameDithering)|\(perGameFastForwardVolume)|\(perGameIOP)|\(perGameVU0)|\(perGameVU1)|\(perGameHWDownloadMode)|\(perGameCPUCLUT)|\(perGameGPUTargetCLUT)|\(perGameVsyncQueue)|\(perGameLoadTextureReplacements)|\(perGameLoadTextureReplacementsAsync)|\(perGamePrecacheTextureReplacements)|\(perGameSyncToHostRefresh)|\(perGameBufferMS)|\(perGameOutputLatencyMS)|\(perGameEEFpuRound)|\(perGameVU0Round)|\(perGameVU1Round)|\(perGameEEClamp)|\(perGameVUClamp)|\(raEnabledOverride)|\(raHardcoreOverride)|\(perGameFramePacingPreset)|\(perGameAdaptiveResolution)|\(fixes)"
     }
 
     private var hasPendingChanges: Bool {
@@ -411,6 +420,21 @@ struct PerGameSettingsPanel: View {
             Button(settings.localized("Keep Editing"), role: .cancel) {}
         } message: {
             Text(settings.localized("You have unsaved per-game settings changes."))
+        }
+        .confirmationDialog(settings.localized("Clear Per-Game Frame Pacing?"),
+                            isPresented: $showFramePacingResetConfirmation,
+                            titleVisibility: .visible) {
+            Button(settings.localized("Clear"), role: .destructive) {
+                perGameFramePacingPreset = -1
+                perGameAdaptiveResolution = -1
+                perGameVsyncQueue = -1
+                perGameSyncToHostRefresh = -1
+                perGameBufferMS = -1
+                perGameOutputLatencyMS = -1
+            }
+            Button(settings.localized("Cancel"), role: .cancel) {}
+        } message: {
+            Text(settings.localized("This removes your overrides for this game. It will use your global Frame Pacing settings."))
         }
     }
 
@@ -521,6 +545,7 @@ struct PerGameSettingsPanel: View {
         switch category {
         case .general:  return AnyView(generalTab)
         case .graphics: return AnyView(graphicsTab)
+        case .framePacing: return AnyView(framePacingTab)
         case .audio:    return AnyView(audioTab)
         case .cpu:      return AnyView(cpuTab)
         case .pad:      return AnyView(padTab)
@@ -616,6 +641,20 @@ struct PerGameSettingsPanel: View {
             perGameBufferMS: $perGameBufferMS,
             perGameOutputLatencyMS: $perGameOutputLatencyMS,
             settings: settings
+        )
+    }
+
+    private var framePacingTab: some View {
+        FramePacingTab(
+            enabled: $enabled,
+            settings: settings,
+            perGameFramePacingPreset: $perGameFramePacingPreset,
+            perGameAdaptiveResolution: $perGameAdaptiveResolution,
+            perGameVsyncQueue: $perGameVsyncQueue,
+            perGameSyncToHostRefresh: $perGameSyncToHostRefresh,
+            perGameBufferMS: $perGameBufferMS,
+            perGameOutputLatencyMS: $perGameOutputLatencyMS,
+            showResetConfirmation: $showFramePacingResetConfirmation
         )
     }
 
@@ -768,6 +807,11 @@ struct PerGameSettingsPanel: View {
                 graphicsTab
             } label: {
                 Label(settings.localized("Graphics"), systemImage: "paintbrush")
+            }
+            NavigationLink {
+                framePacingTab
+            } label: {
+                Label(settings.localized("Frame Pacing"), systemImage: "speedometer")
             }
             NavigationLink {
                 audioTab
@@ -1277,6 +1321,16 @@ struct PerGameSettingsPanel: View {
             Self.setPerGameIntValue("SPU2/Output", "OutputLatencyMS", perGameOutputLatencyMS, useCurrent: useCurrent, iso: iso)
         } else {
             Self.clearPerGameValue("SPU2/Output", "OutputLatencyMS", useCurrent: useCurrent, iso: iso)
+        }
+        if enabled && perGameFramePacingPreset != -1 {
+            Self.setPerGameIntValue("ARMSX2iOS/FramePacing", "Preset", perGameFramePacingPreset, useCurrent: useCurrent, iso: iso)
+        } else {
+            Self.clearPerGameValue("ARMSX2iOS/FramePacing", "Preset", useCurrent: useCurrent, iso: iso)
+        }
+        if enabled && perGameAdaptiveResolution != -1 {
+            Self.setPerGameBoolValue("ARMSX2iOS/FramePacing", "DynamicResolution", perGameAdaptiveResolution == 1, useCurrent: useCurrent, iso: iso)
+        } else {
+            Self.clearPerGameValue("ARMSX2iOS/FramePacing", "DynamicResolution", useCurrent: useCurrent, iso: iso)
         }
         if enabled && eeCycleSkip != -1 {
             Self.setPerGameIntValue("EmuCore/Speedhacks", "EECycleSkip", eeCycleSkip, useCurrent: useCurrent, iso: iso)
