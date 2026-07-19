@@ -1327,6 +1327,19 @@ struct PerGameSettingsPanel: View {
         } else {
             Self.clearPerGameValue("ARMSX2iOS/FramePacing", "Preset", useCurrent: useCurrent, iso: iso)
         }
+        // Cascade the D-01 row's individual keys when a named preset is picked
+        // per-game (raw values 0...3). FramePacingPreset(rawValue:) returns nil
+        // for Use Global (-1); framePacingPresetTable[preset] returns nil for
+        // .custom (raw 4 — not in the table). Placed after the individual-key
+        // writes above so the named preset's curated profile wins over stale
+        // per-game Picker state. Closes gap #2 from 04.1-VERIFICATION.md.
+        if enabled, let preset = FramePacingPreset(rawValue: perGameFramePacingPreset),
+           let values = SettingsStore.framePacingPresetTable[preset] {
+            Self.setPerGameIntValue("EmuCore/GS", "VsyncQueueSize", values.vsyncQueueSize, useCurrent: useCurrent, iso: iso)
+            Self.setPerGameIntValue("SPU2/Output", "OutputLatencyMS", values.audioOutputLatencyMs, useCurrent: useCurrent, iso: iso)
+            Self.setPerGameIntValue("SPU2/Output", "BufferMS", values.audioBufferMs, useCurrent: useCurrent, iso: iso)
+            Self.setPerGameBoolValue("EmuCore/GS", "SyncToHostRefreshRate", values.syncToHostRefresh, useCurrent: useCurrent, iso: iso)
+        }
         if enabled && perGameAdaptiveResolution != -1 {
             Self.setPerGameBoolValue("ARMSX2iOS/FramePacing", "DynamicResolution", perGameAdaptiveResolution == 1, useCurrent: useCurrent, iso: iso)
         } else {
