@@ -6,7 +6,14 @@ import SwiftUI
 /// Destinations the pause menu hands back to the host to present. (Also the associated payload of
 /// the host's overlay route state machine.)
 enum QuickMenuDestination: Equatable {
-    case perGame, speed, saveStates, cheats, retroAchievements, padLayout, resetROM
+    case perGame
+    case speed
+    case framePacing
+    case saveStates
+    case cheats
+    case retroAchievements
+    case padLayout
+    case resetROM
 }
 
 /// Native in-game pause menu: a premium opaque graphite "command deck" presented by the host as a
@@ -198,6 +205,10 @@ struct QuickMenuView: View {
             OverlayActionRow(label: settings.localized("Speed / Fast Forward"), systemImage: "forward.fill") {
                 onOpen(.speed)
             }
+            OverlayActionRow(label: settings.localized("Frame Pacing"), systemImage: "speedometer") {
+                onOpen(.framePacing)
+            }
+            .accessibilityHint(settings.localized("Frame limiter, vsync queue, audio buffer, and presets"))
         }
     }
 
