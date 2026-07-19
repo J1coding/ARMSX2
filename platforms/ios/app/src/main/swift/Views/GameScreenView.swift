@@ -94,6 +94,11 @@ struct GameScreenView: View {
     @State private var menuButtonHidden = false
     @State private var vmMenuAvailable = false
     @State private var gameMenuAvailable = false
+    // Backs the Pacing HUD overlay (Plan 04.1-04). Polls ARMSX2Bridge.frameTimeHistory
+    // + audioBufferHealthMs every 500 ms; the overlay is mounted in both landscape and
+    // portrait, gated behind `settings.osdShowFrameTimes` so casual users see only the
+    // game.
+    @State private var pacingHUDModel = FramePacingHUDModel()
     // MARK: Overlay Route
     // The pause card + every screen launched from it are driven by one FSM. Opening a child
     // transitions `.paused -> .pausedPresenting(child)` without tearing the card down; the child
@@ -209,6 +214,15 @@ struct GameScreenView: View {
                             .accessibilityAddTraits(.isImage)
                             .accessibilityHint("VoiceOver image recognition can read on-screen text.")
                         AccessibilityHUDMirror()
+                        if settings.osdShowFrameTimes {
+                            // Pacing HUD (Plan 04.1-04) — sits ABOVE the game surface so the
+                            // readouts are visible over gameplay, but BELOW the virtual
+                            // controller so it never intercepts touch input. Gated behind the
+                            // existing `osdShowFrameTimes` debug-overlay toggle so casual users
+                            // see only the game (UI-SPEC §Scope Boundaries).
+                            FramePacingHUDOverlay(model: pacingHUDModel)
+                                .allowsHitTesting(false)
+                        }
                         if effectiveVirtualPadVisible {
                             VirtualControllerView(
                                 isLandscape: true,
@@ -235,6 +249,15 @@ struct GameScreenView: View {
                             .accessibilityAddTraits(.isImage)
                             .accessibilityHint("VoiceOver image recognition can read on-screen text.")
                             .overlay { AccessibilityHUDMirror() }
+                            .overlay(alignment: .top) {
+                                if settings.osdShowFrameTimes {
+                                    // Pacing HUD portrait mount (Plan 04.1-04). Same gate as the
+                                    // landscape ZStack; `.allowsHitTesting(false)` so pad input
+                                    // falls through to the game surface below.
+                                    FramePacingHUDOverlay(model: pacingHUDModel)
+                                        .allowsHitTesting(false)
+                                }
+                            }
 
                         if effectiveVirtualPadVisible {
                             ZStack {
@@ -343,12 +366,14 @@ struct GameScreenView: View {
             refreshRuntimeMenuState()
             consumePendingRetroAchievementsToast()
             startMenuRestorePollingIfNeeded()
+            pacingHUDModel.startPolling()
         }
         .onDisappear {
             statusBanner.cancelDismiss()
             achievementsBanner.cancelDismiss()
             stopMenuRestorePolling()
             leaveGameplaySystemChromeMode()
+            pacingHUDModel.stopPolling()
         }
         // Single chokepoint for runtime pause: VM pause derives only from `overlayRoute`
         // (any non-hidden route keeps the VM paused), so one observer covers every child
