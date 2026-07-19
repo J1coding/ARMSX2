@@ -5,6 +5,21 @@ import Foundation
 
 /// Configuration-only: holds the INI section/key/writer for a setting. The
 /// @Observable macro owns the stored property; didSet consults this config.
+///
+/// CRITICAL: `onSet` is invoked from each property's `didSet` (e.g.,
+/// `SettingsStore.swift:527` for `upscaleMultiplier`). Swift's init-time
+/// observer-suppression rule means `didSet` does NOT fire during
+/// `SettingsStore.init()` body assignments — so `onSet` is never reached
+/// from that path. If a future change to `Setting<Value>` semantics or to
+/// `SettingsStore.init()` structure causes `onSet` to fire during init
+/// (e.g., a `convenience init` that mutates a property after delegation),
+/// the 22 closures that reference
+/// `SettingsStore.shared.requestGraphicsApplyGuarded()` (lines 523-1072)
+/// would re-enter the in-flight `swift_once` token and deadlock
+/// `dispatch_once` on iOS 26.x (SIGTRAP "BUG IN CLIENT OF LIBDISPATCH") or
+/// produce `doesNotRecognizeSelector` on iOS 27 (SIGABRT). Guarded by
+/// `test_ios_settingsstore_init_no_shared_access.py` and the
+/// `requestGraphicsApplyGuarded()` helper.
 struct Setting<Value> {
     let section: String
     let key: String
