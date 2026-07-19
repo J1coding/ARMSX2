@@ -220,6 +220,16 @@
         self.window.backgroundColor = [UIColor systemGroupedBackgroundColor];
         [self.window makeKeyAndVisible];
 
+        // ProMotion panel lock (Item 6): unlock >60 Hz on iPhone Pro / iPad Pro panels.
+        // CADisableMinimumFrameDurationOnPhone in Info.plist.in is the prerequisite;
+        // this opt-in tells UIKit the scene wants the panel's maximum refresh rate.
+        // Non-ProMotion devices report maximumFramesPerSecond = 60, so the range becomes
+        // (60, 60, 60) which is a no-op. PS2 content still runs at 60 FPS (clean 2:1).
+        if (@available(iOS 15.0, *)) {
+            NSInteger max = (NSInteger)windowScene.screen.maximumFramesPerSecond;
+            windowScene.preferredFrameRateRange = CAFrameRateRangeMake(60, max, max);
+        }
+
 // Create game render view — SwiftUI MetalGameView (UIViewRepresentable) manages placement
         g_gameRenderView = [[ARMSX2GameView alloc] initWithFrame:CGRectZero];
         g_gameRenderView.backgroundColor = [UIColor blackColor];
