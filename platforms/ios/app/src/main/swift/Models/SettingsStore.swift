@@ -1840,8 +1840,8 @@ final class SettingsStore {
         // deadlocking dispatch_once: iOS 26.x (SIGTRAP "BUG IN CLIENT OF LIBDISPATCH"),
         // iOS 27 (SIGABRT via doesNotRecognizeSelector). Guarded by
         // test_ios_settingsstore_init_no_shared_access.py.
-        DispatchQueue.main.async {
-            FrameTimeDynamicResolutionController.shared.setEnabled(_initialAdaptiveResolution)
+        DispatchQueue.main.async { [self] in
+            FrameTimeDynamicResolutionController.shared.setEnabled(self.adaptiveResolutionEnabled)
         }
         dev9HddEnabled = ARMSX2Bridge.getINIBool("DEV9/Hdd", key: "HddEnable", defaultValue: false)
         dev9HddFile = ARMSX2Bridge.getINIString("DEV9/Hdd", key: "HddFile", defaultValue: "DEV9hdd.raw")
