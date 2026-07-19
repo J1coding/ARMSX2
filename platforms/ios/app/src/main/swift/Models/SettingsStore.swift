@@ -1813,7 +1813,17 @@ final class SettingsStore {
         // the persisted value.
         let _initialAdaptiveResolution = ARMSX2Bridge.getINIBool("ARMSX2iOS/FramePacing", key: "DynamicResolution", defaultValue: false)
         adaptiveResolutionEnabled = _initialAdaptiveResolution
-        FrameTimeDynamicResolutionController.shared.setEnabled(_initialAdaptiveResolution)
+        // CRITICAL: this setEnabled call is deferred to the next runloop tick
+        // via DispatchQueue.main.async so it does NOT re-enter the in-flight
+        // swift_once token of this very init() call. Running it inline would
+        // have FrameTimeDynamicResolutionController.setEnabled read
+        // SettingsStore.shared.upscaleMultiplier — re-entering swift_once and
+        // deadlocking dispatch_once: iOS 26.x (SIGTRAP "BUG IN CLIENT OF LIBDISPATCH"),
+        // iOS 27 (SIGABRT via doesNotRecognizeSelector). Guarded by
+        // test_ios_settingsstore_init_no_shared_access.py.
+        DispatchQueue.main.async {
+            FrameTimeDynamicResolutionController.shared.setEnabled(_initialAdaptiveResolution)
+        }
         dev9HddEnabled = ARMSX2Bridge.getINIBool("DEV9/Hdd", key: "HddEnable", defaultValue: false)
         dev9HddFile = ARMSX2Bridge.getINIString("DEV9/Hdd", key: "HddFile", defaultValue: "DEV9hdd.raw")
         dev9EthernetEnabled = ARMSX2Bridge.getINIBool("DEV9/Eth", key: "EthEnable", defaultValue: false)
