@@ -140,14 +140,19 @@ final class SettingsStore {
     /// Defensive entry point for `Setting<T>` onSet closures.
     ///
     /// The 22 `onSet: { _ in SettingsStore.shared.requestGraphicsApplyGuarded() }`
-    /// closures (lines 523-1072) are stored as struct properties and invoked
-    /// only from each property's `didSet`. Swift's init-time observer
-    /// suppression means `didSet` does NOT fire during `SettingsStore.init()`,
+    /// closures (the graphics-pipeline Settings: upscaleMultiplier, textureFiltering,
+    /// fxaa, casMode, casSharpness, interlaceMode, aspectRatio, trilinearFiltering,
+    /// maxAnisotropy, tvShader, upscaler, pcrtcOffsets, pcrtcOverscan, pcrtcAntiBlur,
+    /// disableInterlaceOffset, skipDuplicateFrames, integerScaling, shadeBoost,
+    /// shadeBoostBrightness, shadeBoostContrast, shadeBoostSaturation, shadeBoostGamma)
+    /// are stored as struct properties and invoked only from each property's
+    /// `didSet`. Swift's init-time observer suppression means `didSet` does NOT
+    /// fire during `SettingsStore.init()`,
     /// so these closures are never invoked from that path. This helper is
     /// belt-and-braces: if a future refactor causes onSet to fire during
     /// init (e.g., a convenience init that mutates a property after
     /// delegation), the `suppressINIWrites` check — true for the duration
-    /// of `init()` (line 1628 set, line 1629 defer-cleared) — prevents
+    /// of `init()` (set at the top of `private init()`, defer-cleared on exit) — prevents
     /// the call from descending into `requestGraphicsApply()` and the
     /// downstream GS pipeline reload. Guarded by
     /// `test_ios_settingsstore_init_no_shared_access.py`.
