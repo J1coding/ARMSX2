@@ -11,6 +11,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
     case appearance
     case emulator
     case graphics
+    case framePacing
     case audio
     case network
     case memoryCards
@@ -35,6 +36,8 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
             return "Emulator"
         case .graphics:
             return "Graphics"
+        case .framePacing:
+            return "Frame Pacing"
         case .audio:
             return "Audio"
         case .network:
@@ -70,6 +73,8 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
             return "cpu"
         case .graphics:
             return "paintbrush"
+        case .framePacing:
+            return "speedometer"
         case .audio:
             return "speaker.wave.2"
         case .network:
@@ -145,6 +150,11 @@ struct SettingsRootView: View {
                     GraphicsSettingsView()
                 } label: {
                     Label(settings.localized("Graphics"), systemImage: "paintbrush")
+                }
+                NavigationLink {
+                    FramePacingSettingsView()
+                } label: {
+                    Label(settings.localized("Frame Pacing"), systemImage: "speedometer")
                 }
                 NavigationLink {
                     AudioSettingsView()
@@ -343,6 +353,8 @@ struct SettingsRootView: View {
             EmulatorSettingsView()
         case .graphics:
             GraphicsSettingsView()
+        case .framePacing:
+            FramePacingSettingsView()
         case .audio:
             AudioSettingsView()
         case .network:
