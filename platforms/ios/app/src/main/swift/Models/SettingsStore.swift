@@ -137,6 +137,25 @@ final class SettingsStore {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: workItem)
     }
 
+    /// Defensive entry point for `Setting<T>` onSet closures.
+    ///
+    /// The 22 `onSet: { _ in SettingsStore.shared.requestGraphicsApplyGuarded() }`
+    /// closures (lines 523-1072) are stored as struct properties and invoked
+    /// only from each property's `didSet`. Swift's init-time observer
+    /// suppression means `didSet` does NOT fire during `SettingsStore.init()`,
+    /// so these closures are never invoked from that path. This helper is
+    /// belt-and-braces: if a future refactor causes onSet to fire during
+    /// init (e.g., a convenience init that mutates a property after
+    /// delegation), the `suppressINIWrites` check — true for the duration
+    /// of `init()` (line 1628 set, line 1629 defer-cleared) — prevents
+    /// the call from descending into `requestGraphicsApply()` and the
+    /// downstream GS pipeline reload. Guarded by
+    /// `test_ios_settingsstore_init_no_shared_access.py`.
+    func requestGraphicsApplyGuarded() {
+        guard !suppressINIWrites else { return }
+        requestGraphicsApply()
+    }
+
     /// Marks the start of a visual slider drag so per-tick value changes do not each
     /// trigger a graphics reload. Balanced by endVisualSliderEdit(), which fires a
     /// single coalesced apply when the last drag ends.
