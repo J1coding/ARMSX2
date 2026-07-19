@@ -238,6 +238,15 @@ typedef void (^ARMSX2RetroAchievementsCompletion)(BOOL success, NSString * _Nonn
 + (void)applyGraphicsSettingsNow;
 + (void)flushINISettings;
 
+// Frame-time history + audio buffer health (read-only; powers the Pacing HUD overlay
+// and the Adaptive Resolution controller). frameTimeHistory wraps
+// PerformanceMetrics::GetFrameTimeHistory() (thread-safe read of 150 samples).
+// audioBufferHealthMs returns -1 when no clean SPU2 stream-state read path exists; the
+// HUD renders an em-dash in that case (UI-SPEC E6 empty state).
++ (nonnull NSArray<NSNumber *> *)frameTimeHistory;
++ (NSUInteger)frameTimeHistoryPos;
++ (int)audioBufferHealthMs;
+
 // MetalFX Spatial upscaler availability probe. Returns YES only on iOS 16+ with
 // a device GPU that reports MetalFX support (NO on the simulator and unsupported
 // hardware). Used by the settings UI to hide the Upscaler option where unusable.

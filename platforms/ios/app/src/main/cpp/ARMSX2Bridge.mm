@@ -45,6 +45,7 @@ extern "C" void ARMSX2_iOSCopyDeviceStats(int* outBatteryPercent, int* outTherma
 #include "ps2/BiosTools.h"
 #include "pcsx2/Host.h"
 #include "pcsx2/INISettingsInterface.h"
+#include "pcsx2/PerformanceMetrics.h"
 #include "common/FileSystem.h"
 #include "common/Path.h"
 #include "common/ZipHelpers.h"
@@ -3525,6 +3526,39 @@ static std::string ARMSX2PerGameSettingsPath(const std::string& serial, u32 crc)
         return [MTLFXSpatialScalerDescriptor supportsDevice:device];
     }
     return NO;
+}
+
+#pragma mark - Frame Pacing HUD
+
+// Returns the 150-sample PerformanceMetrics frame-time history (read-only; the EE
+// thread writes the array, reads on ARM64 are benign per RESEARCH §A4). Used by the
+// SwiftUI Pacing HUD overlay and the Adaptive Resolution controller. Each sample is
+// boxed as an NSNumber (float) so Swift sees `[NSNumber]` ≈ `[Float]` via the bridge.
++ (nonnull NSArray<NSNumber *> *)frameTimeHistory {
+    const PerformanceMetrics::FrameTimeHistory& history = PerformanceMetrics::GetFrameTimeHistory();
+    NSMutableArray<NSNumber *>* result = [NSMutableArray arrayWithCapacity:history.size()];
+    for (size_t i = 0; i < history.size(); i++) {
+        [result addObject:@(history[i])];
+    }
+    return result;
+}
+
+// Returns the current write cursor inside the 150-sample ring buffer. The HUD uses
+// this to read the most recent N samples (those written just before the cursor)
+// rather than treating the array as a linear window.
++ (NSUInteger)frameTimeHistoryPos {
+    return (NSUInteger)PerformanceMetrics::GetFrameTimeHistoryPos();
+}
+
+// Returns the SPU2/cubeb output stream's current buffered audio in milliseconds, or
+// -1 when no clean read path exists. The SPU2 namespace does not currently expose
+// `AudioStream::GetBufferedFramesRelaxed()` (the stream is file-static inside
+// pcsx2/SPU2/spu2.cpp), so we conservatively return -1 and let the HUD render an
+// em-dash per UI-SPEC E6. A focused future plan can add an
+// `SPU2::GetBufferedFramesRelaxed()` accessor (1 line in spu2.h + ~3 lines in
+// spu2.cpp) and flip this branch to compute `(frames * 1000) / sample_rate`.
++ (int)audioBufferHealthMs {
+    return -1;
 }
 
 #pragma mark - Per-game INI getter/setter
