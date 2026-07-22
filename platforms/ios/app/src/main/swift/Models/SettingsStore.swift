@@ -1650,6 +1650,27 @@ final class SettingsStore {
             UserDefaults.standard.set(backgroundDim, forKey: "ARMSX2iOSBackgroundDim")
         }
     }
+    var backgroundEnabledInBIOS: Bool = true {
+        didSet {
+            UserDefaults.standard.set(backgroundEnabledInBIOS, forKey: "ARMSX2iOSBackgroundEnabledInBIOS")
+        }
+    }
+    var backgroundEnabledInHelp: Bool = false {
+        didSet {
+            UserDefaults.standard.set(backgroundEnabledInHelp, forKey: "ARMSX2iOSBackgroundEnabledInHelp")
+        }
+    }
+    var backgroundEnabledInSettings: Bool = false {
+        didSet {
+            UserDefaults.standard.set(backgroundEnabledInSettings, forKey: "ARMSX2iOSBackgroundEnabledInSettings")
+        }
+    }
+
+    var hasCustomBackground: Bool {
+        dynamicBackgroundsEnabled
+            || backgroundPrimaryAsset != nil
+            || backgroundLandscapeAsset != nil
+    }
 
     // aspectRatioName / aspectRatioValue — see SettingsStore+Graphics.swift.
     // loadedFastBoot / loadedJITScriptProtocol — see SettingsStore+Speedhacks.swift.
@@ -1881,6 +1902,9 @@ final class SettingsStore {
         backgroundLandscapeFitMode = BackgroundFitMode(rawValue: UserDefaults.standard.string(forKey: "ARMSX2iOSBackgroundLandscapeFitMode") ?? "") ?? .fill
         backgroundVideoMuted = UserDefaults.standard.object(forKey: "ARMSX2iOSBackgroundVideoMuted") as? Bool ?? true
         backgroundDim = Self.clampedBackgroundDim(UserDefaults.standard.object(forKey: "ARMSX2iOSBackgroundDim") as? Double ?? 0.0)
+        backgroundEnabledInBIOS = UserDefaults.standard.object(forKey: "ARMSX2iOSBackgroundEnabledInBIOS") as? Bool ?? true
+        backgroundEnabledInHelp = UserDefaults.standard.object(forKey: "ARMSX2iOSBackgroundEnabledInHelp") as? Bool ?? false
+        backgroundEnabledInSettings = UserDefaults.standard.object(forKey: "ARMSX2iOSBackgroundEnabledInSettings") as? Bool ?? false
         normalizeDEV9Settings()
         VPadSkinLibraryStore.shared.adoptLegacySelection(virtualPadSkin)
         ARMSX2Bridge.setINIString("EmuCore/GS", key: "AspectRatio", value: Self.aspectRatioName(for: aspectRatio))
@@ -2097,6 +2121,9 @@ final class SettingsStore {
         backgroundLandscapeFitMode = BackgroundFitMode(rawValue: UserDefaults.standard.string(forKey: "ARMSX2iOSBackgroundLandscapeFitMode") ?? "") ?? .fill
         backgroundVideoMuted = UserDefaults.standard.object(forKey: "ARMSX2iOSBackgroundVideoMuted") as? Bool ?? true
         backgroundDim = Self.clampedBackgroundDim(UserDefaults.standard.object(forKey: "ARMSX2iOSBackgroundDim") as? Double ?? 0.0)
+        backgroundEnabledInBIOS = UserDefaults.standard.object(forKey: "ARMSX2iOSBackgroundEnabledInBIOS") as? Bool ?? true
+        backgroundEnabledInHelp = UserDefaults.standard.object(forKey: "ARMSX2iOSBackgroundEnabledInHelp") as? Bool ?? false
+        backgroundEnabledInSettings = UserDefaults.standard.object(forKey: "ARMSX2iOSBackgroundEnabledInSettings") as? Bool ?? false
         normalizeDEV9Settings()
         VPadSkinLibraryStore.shared.adoptLegacySelection(virtualPadSkin)
     }
