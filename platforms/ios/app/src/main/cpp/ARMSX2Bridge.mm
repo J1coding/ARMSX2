@@ -558,8 +558,6 @@ static bool ARMSX2RetroAchievementsHardcoreActive()
 
 static void ARMSX2LogRetroAchievementsHardcoreBlock(const char* action)
 {
-    std::fprintf(stderr, "@@RA_HARDCORE_BLOCK@@ action=%s\n", action ? action : "unknown");
-    std::fflush(stderr);
     NSLog(@"[ARMSX2Bridge] RetroAchievements Hardcore blocked action=%s", action ? action : "unknown");
 }
 
@@ -4476,18 +4474,6 @@ static std::string ARMSX2PerGameSettingsPath(const std::string& serial, u32 crc)
         displayName = savedUsernameValue;
     }
 
-    std::fprintf(stderr, "@@RA_STATE@@ enabled=%d active=%d logged_in=%d saved_username=%d saved_token=%d login_pending=%d has_game=%d hardcore_pref=%d hardcore_active=%d\n",
-        EmuConfig.Achievements.Enabled ? 1 : 0,
-        active ? 1 : 0,
-        loggedIn ? 1 : 0,
-        savedUsername ? 1 : 0,
-        savedToken ? 1 : 0,
-        loginPending ? 1 : 0,
-        hasGame ? 1 : 0,
-        EmuConfig.Achievements.HardcoreMode ? 1 : 0,
-        hardcoreActive ? 1 : 0);
-    std::fflush(stderr);
-
     return @{
         @"supported": @(ARMSX2RetroAchievementsAvailable),
         @"hardcoreSupported": @(ARMSX2RetroAchievementsHardcoreAvailable),
@@ -4565,8 +4551,6 @@ static std::string ARMSX2PerGameSettingsPath(const std::string& serial, u32 crc)
         dispatch_sync(dispatch_get_main_queue(), consume);
     }
 
-    std::fprintf(stderr, "@@RA_NOTIFY_CONSUME@@ pending=%d\n", pending ? 1 : 0);
-    std::fflush(stderr);
     return pending;
 }
 
