@@ -1,17 +1,25 @@
 package com.armsx2.ui.settings
 
 import androidx.compose.foundation.BorderStroke
+import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,6 +48,7 @@ import java.io.File
 @Composable
 fun AppTab() {
     val currentLanguage = I18n.languages.firstOrNull { it.code == I18n.current }
+    val appContext = LocalContext.current
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -79,31 +88,77 @@ fun AppTab() {
             }
         }
 
-        SegmentedRow(
-            label = str("app.theme"),
-            options = listOf(
-                str("app.theme.system"), str("app.theme.light"), str("app.theme.dark"),
-                str("app.theme.black"), str("app.theme.oled"),
-            ),
-            selectedIndex = when (ThemePreferences.mode.value) {
-                ThemeMode.System -> 0
-                ThemeMode.Light -> 1
-                ThemeMode.Dark -> 2
-                ThemeMode.Black -> 3
-                ThemeMode.Oled -> 4
-            },
-            onChange = { index ->
-                ThemePreferences.set(
-                    when (index) {
-                        1 -> ThemeMode.Light
-                        2 -> ThemeMode.Dark
-                        3 -> ThemeMode.Black
-                        4 -> ThemeMode.Oled
-                        else -> ThemeMode.System
-                    },
-                )
-            },
-        )
+        // Theme picker. NOT a SegmentedRow: that's a fixed-width Box, so eleven options would
+        // squeeze into unreadable slivers — this wraps instead. Driven straight off the enum so
+        // adding a colour needs no index bookkeeping; the old version mapped index<->mode by hand
+        // in two separate places, which is precisely how such pairs drift out of sync.
+        Column(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+            Text(str("app.theme"), style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                // Material You needs Android 12. Hide it below that rather than letting it fall
+                // back silently — picking a theme and getting a different one reads as a bug.
+                ThemeMode.entries.filter {
+                    !it.requiresDynamicColor || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                }.forEach { theme ->
+                    val apply = { ThemePreferences.set(theme) }
+                    FilterChip(
+                        selected = ThemePreferences.mode.value == theme,
+                        onClick = apply,
+                        label = { Text(str("app.theme.${theme.name.lowercase()}")) },
+                        shape = RoundedCornerShape(11.dp),
+                        modifier = Modifier.controllerFocusable(
+                            "app.theme.${theme.name}",
+                            RoundedCornerShape(11.dp),
+                            onConfirm = apply,
+                        ),
+                    )
+                }
+            }
+
+            // RGB picker, only while Custom is the active theme. The scheme is derived from
+            // this colour's hue with saturation/brightness clamped (see customScheme), so the
+            // accent stays recognisably what was picked without any channel combination being
+            // able to produce unreadable chrome.
+            if (ThemePreferences.mode.value == ThemeMode.Custom) {
+                val argb = ThemePreferences.customColor.value
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        modifier = Modifier.size(34.dp),
+                        shape = RoundedCornerShape(9.dp),
+                        color = Color(argb),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    ) {}
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        String.format("#%06X", 0xFFFFFF and argb),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                listOf(
+                    Triple("app.theme.custom.r", 16, android.graphics.Color.red(argb)),
+                    Triple("app.theme.custom.g", 8, android.graphics.Color.green(argb)),
+                    Triple("app.theme.custom.b", 0, android.graphics.Color.blue(argb)),
+                ).forEach { (labelKey, shift, value) ->
+                    IntSliderRow(
+                        label = str(labelKey),
+                        value = value,
+                        min = 0,
+                        max = 255,
+                        onChange = { channel ->
+                            // Replace just this channel, keeping alpha opaque.
+                            val cleared = argb and (0xFF shl shift).inv()
+                            ThemePreferences.setCustomColor(cleared or (channel shl shift) or (0xFF shl 24))
+                        },
+                    )
+                }
+            }
+        }
 
         ToggleRow(
             label = str("app.bootLogo"),
@@ -111,6 +166,59 @@ fun AppTab() {
             description = str("app.bootLogo.desc"),
             onChange = { BootLogoPreferences.set(it) },
         )
+
+        ToggleRow(
+            label = str("app.libraryMusic"),
+            value = com.armsx2.LibraryMusic.enabled.value,
+            description = str("app.libraryMusic.desc"),
+            onChange = { com.armsx2.LibraryMusic.set(appContext, it) },
+        )
+        if (com.armsx2.LibraryMusic.enabled.value) {
+            IntSliderRow(
+                label = str("app.libraryMusic.volume"),
+                value = com.armsx2.LibraryMusic.volumePercent.value,
+                min = 0,
+                max = 100,
+                valueFormatter = { "$it%" },
+                onChange = { com.armsx2.LibraryMusic.setVolume(it) },
+            )
+            // Custom track: plays a file the user picked from their own device. The app never
+            // ships or redistributes it — same model as importing a texture pack or skin.
+            val musicPicker = rememberLauncherForActivityResult(
+                ActivityResultContracts.OpenDocument()
+            ) { uri ->
+                if (uri != null) {
+                    val name = androidx.documentfile.provider.DocumentFile
+                        .fromSingleUri(appContext, uri)?.name ?: "Custom track"
+                    com.armsx2.LibraryMusic.setCustomTrack(appContext, uri, name)
+                }
+            }
+            val custom = com.armsx2.LibraryMusic.customName.value
+            Text(
+                if (custom != null) str("app.libraryMusic.current").format(custom)
+                else str("app.libraryMusic.default"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+            )
+            Row(
+                Modifier.fillMaxWidth().padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                val pick = { musicPicker.launch(arrayOf("audio/*")) }
+                OutlinedButton(
+                    onClick = pick,
+                    modifier = Modifier.controllerFocusable("app.libraryMusic.choose", onConfirm = pick),
+                ) { Text(str("app.libraryMusic.choose")) }
+                if (custom != null) {
+                    val reset = { com.armsx2.LibraryMusic.clearCustomTrack(appContext) }
+                    OutlinedButton(
+                        onClick = reset,
+                        modifier = Modifier.controllerFocusable("app.libraryMusic.reset", onConfirm = reset),
+                    ) { Text(str("app.libraryMusic.reset")) }
+                }
+            }
+        }
 
         SegmentedRow(
             label = str("app.toolbarPosition"),

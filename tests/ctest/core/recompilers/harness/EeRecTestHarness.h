@@ -69,11 +69,11 @@ public:
 	void EnableFpuFullMode();
 	void EnableFpuMulHack();
 
-	// Enables the off-by-default fpuGuardedAddSub Recompiler option so the JIT
-	// emits the PS2 FPU add/sub guard-bit masking (single-precision fast path).
-	// Off by default in production, so any test that asserts a masked add/sub
-	// result must opt in. Restored to its previous value in the dtor.
-	void EnableFpuGuarded();
+	// Turns OFF the (default-ON) fpuGuardedAddSub Recompiler option so the JIT
+	// emits a plain single-precision add/sub with no guard-bit masking — the
+	// opt-out perf path. Off makes the JIT bit-identical to the single-precision
+	// interpreter (which never masks). Restored to its previous value in the dtor.
+	void DisableFpuGuarded();
 
 	// ---- Memory ----
 

@@ -23,6 +23,8 @@ data class AchievementItem(
     // Which RA subset this achievement belongs to (0 = base/shared set). Used to split
     // base-game vs bonus-subset achievements into tabs.
     val subsetId: Int = 0,
+    // ACTIVE CHALLENGE (RA "primed") — a can-do-right-now challenge; sorted to the top.
+    val primed: Boolean = false,
 )
 
 /** An RA subset (base set or a bonus subset) for the achievements tab selector. */
@@ -37,6 +39,9 @@ data class AchievementsUiState(
     val userName: String = "",
     val hardcore: Boolean = false,
     val score: Long = 0,
+    val softcoreScore: Long = 0,
+    // RA UserPic URL (empty if not logged in / unknown). Loaded via Coil.
+    val avatarUrl: String = "",
     val items: List<AchievementItem> = emptyList(),
     // RA subsets (base + any bonus subsets). >1 entry → the UI shows subset tabs.
     val subsets: List<Subset> = emptyList(),
@@ -55,6 +60,8 @@ data class AchievementsUiState(
     val unofficialTestMode: Boolean = false,
     // Display name of the user's custom achievement-unlock sound, or null for the default.
     val unlockSoundName: String? = null,
+    // Volume of the unlock sound effect, 0..100 % (app-side, applied in NativeApp.playSound).
+    val soundVolume: Int = 100,
     // Non-null while the hardcore confirm dialog is up; holds the target state.
     val pendingHardcore: Boolean? = null,
     val loading: Boolean = false,
@@ -157,6 +164,8 @@ class AchievementsViewModel(application: Application) : AndroidViewModel(applica
             // enable it. isHardcorePersisted() is valid with or without a running game.
             hardcore = runCatching { NativeApp.isHardcorePersisted() }.getOrDefault(root.optBoolean("hardcore")),
             score = root.optLong("score").coerceAtLeast(0),
+            softcoreScore = root.optLong("softcoreScore").coerceAtLeast(0),
+            avatarUrl = root.optString("avatarUrl"),
             items = parseAchievementItems(json),
             subsets = parseSubsets(json),
             notifications = root.optBoolean("notifications", true),
@@ -168,6 +177,7 @@ class AchievementsViewModel(application: Application) : AndroidViewModel(applica
             spectatorMode = root.optBoolean("spectatorMode", false),
             unofficialTestMode = root.optBoolean("unofficialTestMode", false),
             unlockSoundName = MainActivityRuntime.prefs.getString(UNLOCK_SOUND_PREF, null),
+            soundVolume = MainActivityRuntime.prefs.getInt(SOUND_VOLUME_PREF, 100),
         )
     }
 
@@ -207,6 +217,16 @@ class AchievementsViewModel(application: Application) : AndroidViewModel(applica
         state.value = state.value.copy(unlockSoundName = null)
     }
 
+    /** Volume for the unlock/info sound effect, 0..100 %. Applied app-side in
+     *  NativeApp.playSound (MediaPlayer.setVolume) — the native core just hands it the .wav path,
+     *  so this needs no [Achievements] setting. Takes effect on the next sound. */
+    fun setSoundVolume(pct: Int) {
+        val clamped = pct.coerceIn(0, 100)
+        MainActivityRuntime.prefs.edit().putInt(SOUND_VOLUME_PREF, clamped).apply()
+        NativeApp.sSoundVolume = clamped / 100f
+        state.value = state.value.copy(soundVolume = clamped)
+    }
+
     private fun queryDisplayName(context: android.content.Context, uri: android.net.Uri): String? =
         runCatching {
             context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
@@ -219,8 +239,17 @@ class AchievementsViewModel(application: Application) : AndroidViewModel(applica
         super.onCleared()
     }
 
-    private companion object {
+    companion object {
         const val UNLOCK_SOUND_PREF = "ra.unlockSoundName"
+        const val SOUND_VOLUME_PREF = "ra.soundVolume"
+
+        /** Push the persisted unlock-sound volume into NativeApp at app start, before any
+         *  achievement can unlock — otherwise the first sound of the session plays at full
+         *  volume regardless of the slider until the RA screen is opened. */
+        fun syncSoundVolume() {
+            NativeApp.sSoundVolume =
+                MainActivityRuntime.prefs.getInt(SOUND_VOLUME_PREF, 100).coerceIn(0, 100) / 100f
+        }
     }
 }
 
@@ -248,13 +277,15 @@ fun parseAchievementItems(json: String): List<AchievementItem> {
                     progress = item.optString("measuredProgress"),
                     iconUrl = item.optString("iconUrl", item.optString("badgeUrl")),
                     subsetId = item.optInt("subsetId"),
+                    primed = item.optBoolean("primed"),
                 ),
             )
         }
-    }
-    // Keep RetroAchievements' native list order (its display/progression order = the
-    // story/unlock sequence). We used to re-sort unlocked-first then alphabetically by
-    // title, which made it impossible to see what to unlock next; restore progression.
+    }.sortedBy { if (it.primed) 0 else 1 }
+    // Float ACTIVE-CHALLENGE (primed) achievements to the top for quick identification.
+    // sortedBy is stable, so every non-primed item keeps RetroAchievements' native list
+    // order (its display/progression order = the story/unlock sequence); we used to
+    // re-sort unlocked-first then alphabetically, which hid what to unlock next.
 }
 
 /** Parse the top-level "subsets" array (base + bonus subsets) emitted by the native side. */

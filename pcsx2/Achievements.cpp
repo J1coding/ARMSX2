@@ -485,14 +485,39 @@ std::string Achievements::GetAchievementsAsJSON()
 	out += ",\"userName\":";
 	append_json_string(out, display_name.c_str());
 
-	// Player score. Only available from the persistent client (a game with
-	// achievements is loaded); the post-login temporary client is destroyed,
-	// so report -1 ("unknown") when we can't read it. The panel hides the
-	// points chip on -1 rather than showing a misleading 0.
+	// Player score. Prefer the live persistent-client value; when it's unavailable — logged in
+	// but no game with achievements loaded yet, e.g. the library RA menu — fall back to the score
+	// cached at login (Host::OnAchievementsLoginSuccess persists it to secrets). Only a genuinely
+	// unknown score (never logged in) stays -1, which the panel treats as "hide the chip".
+	const long long score_val = user
+		? static_cast<long long>(user->score)
+		: static_cast<long long>(Host::GetIntSettingValue("Achievements", "LastScore", -1));
+	const long long score_sc_val = user
+		? static_cast<long long>(user->score_softcore)
+		: static_cast<long long>(Host::GetIntSettingValue("Achievements", "LastScoreSoftcore", -1));
 	out += ",\"score\":";
-	out += std::to_string(user ? static_cast<long long>(user->score) : -1LL);
+	out += std::to_string(score_val);
 	out += ",\"softcoreScore\":";
-	out += std::to_string(user ? static_cast<long long>(user->score_softcore) : -1LL);
+	out += std::to_string(score_sc_val);
+
+	// User avatar (RA UserPic). Prefer the client's canonical URL when a live user is
+	// present; otherwise reconstruct it from the saved account username so the library
+	// RA menu (logged in, no game loaded yet) can still show the picture.
+	std::string avatar_url;
+	if (user)
+	{
+		char url_buf[512];
+		if (rc_client_user_get_image_url(user, url_buf, std::size(url_buf)) == RC_OK)
+			avatar_url = url_buf;
+	}
+	if (avatar_url.empty())
+	{
+		const std::string uname = Host::GetBaseStringSettingValue("Achievements", "Username", "");
+		if (!uname.empty())
+			avatar_url = "https://media.retroachievements.org/UserPic/" + uname + ".png";
+	}
+	out += ",\"avatarUrl\":";
+	append_json_string(out, avatar_url.c_str());
 
 	// RA presentation options (global [Achievements] settings) so the panel
 	// can show + toggle them without a second JNI poll. Defaults mirror
@@ -566,6 +591,12 @@ std::string Achievements::GetAchievementsAsJSON()
 						out += std::to_string(ach->points);
 						out += ",\"unlocked\":";
 						out += (ach->state == RC_CLIENT_ACHIEVEMENT_STATE_UNLOCKED) ? "true" : "false";
+						// ACTIVE CHALLENGE = RA "primed" (a can-do-right-now challenge = the
+						// on-screen challenge indicator). Per-achievement ach->bucket is refreshed
+						// every rebuild regardless of list grouping; the outer bucket.bucket_type
+						// can't carry it under LOCK_STATE grouping. The UI floats these to the top.
+						out += ",\"primed\":";
+						out += (ach->bucket == RC_CLIENT_ACHIEVEMENT_BUCKET_ACTIVE_CHALLENGE) ? "true" : "false";
 						out += ",\"bucket\":";
 						out += std::to_string(static_cast<int>(bucket.bucket_type));
 						// Subset this achievement belongs to (0 = base/shared set). Lets the

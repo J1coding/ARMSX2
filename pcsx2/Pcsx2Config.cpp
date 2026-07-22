@@ -473,7 +473,7 @@ Pcsx2Config::RecompilerOptions::RecompilerOptions()
 	fpuOverflow = true;
 	//fpuExtraOverflow = false;
 	//fpuFullMode = false;
-	//fpuGuardedAddSub = false; // add/sub guard-bit emulation is opt-in (perf); games needing it enable it via GameDB clampModes.guardedAddSub.
+	fpuGuardedAddSub = true; // PS2-accurate add/sub guard-bit emulation; opt-out for perf on titles verified not to need it.
 }
 
 void Pcsx2Config::RecompilerOptions::ApplySanityCheck()
@@ -1316,6 +1316,7 @@ void Pcsx2Config::SPU2Options::LoadSave(SettingsWrapper& wrap)
 		SettingsWrapEntry(StandardVolume);
 		SettingsWrapEntry(FastForwardVolume);
 		SettingsWrapEntry(OutputMuted);
+		SettingsWrapEntry(LightweightMode);
 		SettingsWrapParsedEnum(Backend, "Backend", &AudioStream::ParseBackendName, &AudioStream::GetBackendName);
 		SettingsWrapParsedEnum(SyncMode, "SyncMode", &ParseSyncMode, &GetSyncModeName);
 		SettingsWrapEntry(DriverName);
@@ -1335,6 +1336,7 @@ bool Pcsx2Config::SPU2Options::operator==(const SPU2Options& right) const
 		   OpEqu(StandardVolume) &&
 		   OpEqu(FastForwardVolume) &&
 		   OpEqu(OutputMuted) &&
+		   OpEqu(LightweightMode) &&
 		   OpEqu(Backend) &&
 		   OpEqu(StreamParameters) &&
 		   OpEqu(DriverName) &&

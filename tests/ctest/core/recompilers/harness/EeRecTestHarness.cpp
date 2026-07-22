@@ -118,15 +118,16 @@ void EeRecTestHarness::EnableFpuMulHack()
 	EmuConfig.Gamefixes.FpuMulHack = true;
 }
 
-void EeRecTestHarness::EnableFpuGuarded()
+void EeRecTestHarness::DisableFpuGuarded()
 {
 	if (!fpu_guarded_changed_)
 	{
 		prev_fpu_guarded_ = EmuConfig.Cpu.Recompiler.fpuGuardedAddSub;
 		fpu_guarded_changed_ = true;
 	}
-	EmuConfig.Cpu.Recompiler.fpuGuardedAddSub = true;
+	EmuConfig.Cpu.Recompiler.fpuGuardedAddSub = false;
 }
+
 void EeRecTestHarness::SetStatusBits(u32 mask) { cpuRegs.CP0.n.Status.val |= mask; }
 
 // EE vtlb_memWrite on a direct RAM hit bypasses Cpu->Clear — upstream relies

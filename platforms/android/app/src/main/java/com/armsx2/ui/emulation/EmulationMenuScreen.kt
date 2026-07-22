@@ -37,6 +37,7 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -483,21 +484,41 @@ private fun SessionPane(state: EmulationMenuUiState, viewModel: EmulationMenuVie
             TouchControls.setPauseTapToReveal(it)
         }
         Spacer(Modifier.height(6.dp))
-        // Full OSD = any verbose stat line (FPS is shared with Simple, so it's excluded
-        // from the "full is on" test); Simple OSD = FPS only. Reading the same osdShow*
-        // fields two ways keeps the two toggles mutually exclusive.
-        val osdFullOn = with(state.settings) {
-            osdShowVps || osdShowSpeed || osdShowCpu || osdShowGpu || osdShowResolution ||
-                osdShowGsStats || osdShowFrameTimes || osdShowHardwareInfo || osdShowGpuStats || osdShowVersion
+        // OSD mode selector — one control (Full / Minimal / Custom / Off) in place of the old
+        // master + simple toggles, cycled here and by the "Cycle Perf Stats (OSD)" hotkey. Custom
+        // = the detailed per-stat selection from All Settings > On-Screen.
+        val osdModes = com.armsx2.ui.InGameOverlay.OsdMode.entries
+        val osdModeIndex = osdModes.indexOf(com.armsx2.ui.InGameOverlay.osdMode.value).coerceAtLeast(0)
+        MenuCycleRow(
+            title = str("overlay.master.label"),
+            valueLabel = com.armsx2.ui.InGameOverlay.osdModeLabel(osdModes[osdModeIndex]),
+        ) { step ->
+            val size = osdModes.size
+            val next = ((osdModeIndex + step) % size + size) % size
+            com.armsx2.ui.InGameOverlay.setOsdMode(osdModes[next])
         }
-        val osdSimpleOn = state.settings.osdShowFps && !osdFullOn
-        MenuSwitchRow(str("overlay.master.label"), osdFullOn) { viewModel.setOsdMaster(it) }
-        Spacer(Modifier.height(6.dp))
-        MenuSwitchRow(str("overlay.simple.label"), osdSimpleOn) { viewModel.setOsdSimple(it) }
         Spacer(Modifier.height(6.dp))
         MenuSwitchRow(str("perf.frameLimit.label"), state.settings.frameLimitEnable) { value ->
             viewModel.updateSettings { it.copy(frameLimitEnable = value) }
         }
+        Spacer(Modifier.height(6.dp))
+        // Fast-forward SPEED — how fast the FF hotkey/button runs: 2..10x, or Unlimited (the
+        // default, uncapped) at the top. Global pref; re-applied live if FF is currently engaged.
+        var ffSpeed by remember { mutableStateOf(MainActivityRuntime.fastForwardSpeed()) }
+        val ffUnlimitedLabel = str("common.unlimited") // hoisted: str() is @Composable, can't run in the formatter lambda
+        com.armsx2.ui.settings.IntSliderRow(
+            label = str("perf.ffSpeed.label"),
+            value = ffSpeed,
+            min = 2,
+            max = MainActivityRuntime.FF_SPEED_UNLIMITED,
+            valueFormatter = { if (it >= MainActivityRuntime.FF_SPEED_UNLIMITED) ffUnlimitedLabel else "${it}×" },
+            onChange = { v ->
+                ffSpeed = v
+                MainActivityRuntime.setFastForwardSpeed(v)
+                if (MainActivityRuntime.fastForwardToggleActive)
+                    runCatching { kr.co.iefriends.pcsx2.NativeApp.speedhackLimitermode(MainActivityRuntime.ffLimiterMode()) }
+            },
+        )
         Spacer(Modifier.height(6.dp))
         // OSD colour, cycled in place. Shares the palette with the All Settings picker rather
         // than carrying its own copy. Safe to add here: this card's rows are plain switches with
@@ -866,6 +887,19 @@ private fun ControlsPane(state: EmulationMenuUiState, viewModel: EmulationMenuVi
         checked = state.rumbleEnabled,
         onCheckedChange = viewModel::setRumble,
     )
+    // Vibration Strength — the same global 0-200% haptic multiplier as All Settings ›
+    // Controls, reachable here in-game. Local state drives the live update since it's a
+    // plain pref (not part of EmulationMenuUiState).
+    var haptic by remember { mutableStateOf(com.armsx2.input.ControllerMappings.hapticIntensity()) }
+    com.armsx2.ui.settings.IntSliderRow(
+        label = str("pad.hapticStrength.label"),
+        value = haptic,
+        min = 0,
+        max = 200,
+        description = str("pad.hapticStrength.description"),
+        valueFormatter = { if (it == 0) "Off" else "${it}%" },
+        onChange = { haptic = it; com.armsx2.input.ControllerMappings.setHapticIntensity(it) },
+    )
     MenuSwitchRow(str("pad.multitap.label"), state.multitapEnabled, onCheckedChange = viewModel::setMultitap)
     MenuSwitchRow(str("network.emulateUsbKeyboard"), state.settings.usbKeyboard) {
         viewModel.updateSettings { current -> current.copy(usbKeyboard = it) }
@@ -958,6 +992,40 @@ private fun AchievementsPane(state: EmulationMenuUiState, viewModel: EmulationMe
     CompactAction(str("ra.viewAchievements"), "★", Modifier.fillMaxWidth(), viewModel::openAchievements)
     Spacer(Modifier.height(4.dp))
     SectionCard("RetroAchievements") {
+        // Signed-in account: avatar + name + both point totals (hardcore / softcore).
+        if (state.raUserName.isNotBlank()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (state.raAvatarUrl.isNotBlank()) {
+                    AsyncImage(
+                        state.raAvatarUrl,
+                        state.raUserName,
+                        Modifier.size(46.dp).clip(CircleShape),
+                        contentScale = ContentScale.Crop,
+                    )
+                    Spacer(Modifier.width(12.dp))
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        state.raUserName,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "${state.raScore} HC",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = com.armsx2.ui.theme.Danger,
+                        )
+                        Text(
+                            "  ·  ${state.raSoftcoreScore} SC",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
         Text(
             state.achievementSummary,
             style = MaterialTheme.typography.bodyMedium,
@@ -1117,28 +1185,38 @@ private fun <T> HorizontalOptions(
     }
 }
 
-// Free-choice framerate cap (30–120 Hz) instead of a couple of fixed chips. The
-// default (59.94 / 50) is kept exactly until the user drags; dragging snaps to
-// whole Hz so common targets (50/60/72/90/120) are easy to hit.
+// Free-choice framerate slider (20–120 Hz) instead of a couple of fixed chips.
+// The default (59.94 / 50) is kept exactly, and the 60/50 stops snap back to
+// those exact PS2 rates (canonicalFramerate) so the true default is always
+// recoverable; every other stop is whole Hz for easy targets (72/90/120).
 @Composable
 private fun FramerateSlider(title: String, value: Float, onValue: (Float) -> Unit) {
     SectionCard(title) {
         Column(
             Modifier.fillMaxWidth().controllerFocusable(
                 "pause.framerate.$title",
-                onLeft = { onValue((value - 1f).coerceAtLeast(20f)) },
-                onRight = { onValue((value + 1f).coerceAtMost(120f)) },
+                onLeft = { onValue(canonicalFramerate((Math.round(value) - 1).coerceAtLeast(20))) },
+                onRight = { onValue(canonicalFramerate((Math.round(value) + 1).coerceAtMost(120))) },
             ),
         ) {
             val label = if (value % 1f == 0f) "${value.toInt()} Hz" else "%.2f Hz".format(value)
             Text(label, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
             Slider(
                 value = value.coerceIn(20f, 120f),
-                onValueChange = { onValue(Math.round(it).toFloat()) },
+                onValueChange = { onValue(canonicalFramerate(Math.round(it))) },
                 valueRange = 20f..120f,
             )
         }
     }
+}
+
+// The PS2's true NTSC/PAL rates are 59.94/50.00 Hz; the integer slider stops at
+// 60/50 map back to those exact defaults so the canonical rate stays recoverable
+// (dragging otherwise snaps to whole Hz and loses 59.94 forever).
+private fun canonicalFramerate(hz: Int): Float = when (hz) {
+    60 -> 59.94f
+    50 -> 50.00f
+    else -> hz.toFloat()
 }
 
 @Composable

@@ -63,10 +63,9 @@ namespace DOUBLE
 #define FPUflagSU 0x00000008
 
 // Add/Sub guard-bit emulation (matching the PS2's missing mantissa guard bits)
-// is now gated at runtime on CHECK_FPU_GUARDED (the off-by-default
-// fpuGuardedAddSub Recompiler option) rather than a compile-time constant — so
-// both JITs honor the same setting. The Full-mode DOUBLE path keeps its own
-// unconditional guard (iFPUd.cpp).
+// is gated at runtime on CHECK_FPU_GUARDED (the fpuGuardedAddSub Recompiler
+// option, ON by default) so both JITs honor the same setting. The Full-mode
+// DOUBLE path keeps its own unconditional guard (iFPUd.cpp).
 
 alignas(16) static const u32 s_neg[4] = {0x80000000, 0xffffffff, 0xffffffff, 0xffffffff};
 alignas(16) static const u32 s_pos[4] = {0x7fffffff, 0xffffffff, 0xffffffff, 0xffffffff};

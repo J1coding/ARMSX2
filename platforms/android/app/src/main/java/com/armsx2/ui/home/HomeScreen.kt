@@ -88,6 +88,7 @@ import com.armsx2.ui.theme.ToolbarPositionPreferences
 import com.armsx2.ui.theme.LibraryChromePreferences
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalContext
@@ -170,14 +171,31 @@ fun HomeScreen(
         backgroundLayer = {
             val libraryBg = LibraryBackground.uri.value
             if (libraryBg == null) {
-                // Default: the bundled PS3 XMB-wave STILL. It used to be a looping MP4,
-                // but the continuous video decode cost in-library performance (sbro
-                // review), so it's a static image now.
-                Image(
-                    painter = painterResource(R.drawable.library_bg_xmb),
-                    contentDescription = null,
+                // Default: the live PS3-XMB wave (XmbGlView — a GLES3 port of linkev's
+                // grid-displacement mesh, matching iOS). When GL can't init — older Mali without
+                // float-texture filtering, or any EGL failure — we fall back to a looping GIF
+                // instead of a frozen still. The bundled still is the cheap floor shown during GL
+                // startup (and, once the wave is up, sits hidden behind it), so capable devices
+                // never decode the heavy GIF. Custom backgrounds below override all of this.
+                var xmbGlState by remember { mutableStateOf<Boolean?>(null) } // null=starting, true=up, false=failed
+                if (xmbGlState == false) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context).data(R.raw.library_fallback).build(),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else {
+                    Image(
+                        painter = painterResource(R.drawable.library_bg_xmb),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                }
+                AndroidView(
+                    factory = { XmbGlView(it).apply { onGlStatus = { ok -> xmbGlState = ok } } },
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
                 )
             } else {
                 // User-picked still image / GIF (Coil handles both).
@@ -188,13 +206,19 @@ fun HomeScreen(
                     contentScale = ContentScale.Crop,
                 )
             }
-            // Scrim so covers and text stay readable over the backdrop.
+            // Scrim so covers and text stay readable over the backdrop. A user-picked image can
+            // be any brightness, so it gets the full dark scrim. The XMB is our own controlled
+            // backdrop (dark at the top where the content sits) and a heavy scrim just muddied
+            // its blue into navy — so it gets only a whisper of dimming, letting the vivid blue
+            // read through.
+            val scrimTop = if (libraryBg == null) 0.06f else 0.55f
+            val scrimBottom = if (libraryBg == null) 0.20f else 0.80f
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(
                         listOf(
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.55f),
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.80f),
+                            MaterialTheme.colorScheme.background.copy(alpha = scrimTop),
+                            MaterialTheme.colorScheme.background.copy(alpha = scrimBottom),
                         ),
                     ),
                 ),

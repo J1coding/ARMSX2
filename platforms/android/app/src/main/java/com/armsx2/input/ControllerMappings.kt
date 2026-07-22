@@ -66,6 +66,12 @@ object ControllerMappings {
     enum class StickMode(val id: String, val label: String) {
         ANALOG("analog", "Analog"),
         FACE("face", "Face"),
+        // Drive the PS2 digital D-pad (codes 19-22) from this analog stick — the fixed
+        // "stick as D-pad" preset (the nightly's default for Nintendo Joy-Cons, whose
+        // solo d-pad often can't be bound directly). Opt-in: nothing changes for other
+        // controllers unless a user picks it. Handled by the single d-pad owner
+        // (dispatchDpadCombined) so it can't fight the physical HAT.
+        DPAD("dpad", "D-Pad"),
         // Per-direction binding: each direction sends any PS2 button (incl. d-pad),
         // captured by "Press a button". This supersedes the old fixed D-Pad preset.
         CUSTOM("custom", "Custom"),
@@ -277,6 +283,19 @@ object ControllerMappings {
     fun stickAcceleration(left: Boolean): Float = prefStickAccel.get(left)
     fun setStickAcceleration(left: Boolean, v: Float) = prefStickAccel.set(left, v)
 
+    // Response curve: an EXTRA exponent applied to the post-deadzone stick magnitude, on top
+    // of any acceleration (they compose). Tames twitchy hall-effect sticks (e.g. GTA:SA) —
+    // small tilts get finer near center, full tilt still reaches 100%. Per-stick.
+    // 0=Linear (unchanged), 1=Light, 2=Medium, 3=Strong.
+    const val STICK_CURVE_COUNT = 4
+    private val STICK_CURVE_GAMMA = floatArrayOf(0f, 0.5f, 1.0f, 2.0f)
+    private const val KEY_STICK_CURVE = "pad.stick.responseCurve"
+    private val prefStickCurve = PerStickPref(KEY_STICK_CURVE, 0f, 0f, (STICK_CURVE_COUNT - 1).toFloat())
+    fun stickResponseCurve(left: Boolean): Int = prefStickCurve.get(left).toInt()
+    fun setStickResponseCurve(left: Boolean, v: Int) = prefStickCurve.set(left, v.toFloat())
+    fun stickCurveGamma(left: Boolean): Float =
+        STICK_CURVE_GAMMA[stickResponseCurve(left).coerceIn(0, STICK_CURVE_COUNT - 1)]
+
     // App-side analog stick deadzone (fraction of travel ignored). Kept small by
     // default and user-adjustable down to 0 — handheld "switch" sticks have tiny
     // range, so a big deadzone wastes most of it. Output is re-normalized past the
@@ -319,6 +338,22 @@ object ControllerMappings {
     fun setRumbleEnabled(on: Boolean) {
         MainActivityRuntime.prefs.edit { putBoolean(KEY_RUMBLE, on) }
         kr.co.iefriends.pcsx2.NativeApp.sRumbleEnabled = on
+    }
+
+    // Haptic strength: one multiplier scaling ALL vibration — controller rumble AND on-screen
+    // touch ticks both funnel through NativeApp.rumbleOne. 0..200 % (100 = as the game/UI
+    // authored it), so it tames a too-strong motor or boosts a weak one. Persisted and mirrored
+    // into NativeApp.sHapticScale live on change and at app start (MainActivityRuntime).
+    private const val KEY_HAPTIC_INTENSITY = "pad.haptic.intensity"
+    fun hapticIntensity(): Int = MainActivityRuntime.prefs.getInt(KEY_HAPTIC_INTENSITY, 100)
+    fun setHapticIntensity(pct: Int) {
+        val clamped = pct.coerceIn(0, 200)
+        MainActivityRuntime.prefs.edit { putInt(KEY_HAPTIC_INTENSITY, clamped) }
+        kr.co.iefriends.pcsx2.NativeApp.sHapticScale = clamped / 100f
+    }
+    /** Push the persisted haptic strength into the native gate; call once at app start. */
+    fun syncHapticIntensity() {
+        kr.co.iefriends.pcsx2.NativeApp.sHapticScale = hapticIntensity() / 100f
     }
 
     // PS2 Multitap master switch. OFF (default) = classic 2-player co-op. ON = up to 8
@@ -749,7 +784,7 @@ object ControllerMappings {
                 .remove(KEY_LSTICK_INVX).remove(KEY_LSTICK_INVY).remove(KEY_LSTICK_SWAP)
                 .remove(KEY_RSTICK_INVX).remove(KEY_RSTICK_INVY).remove(KEY_RSTICK_SWAP)
             prefStickSens.reset(this); prefStickAccel.reset(this); prefStickDz.reset(this)
-            prefStickOuter.reset(this); prefStickAntiDz.reset(this)
+            prefStickOuter.reset(this); prefStickAntiDz.reset(this); prefStickCurve.reset(this)
             for (p in intArrayOf(P1, P2)) {
                 remove(playerPrefix(p) + KEY_LSTICK).remove(playerPrefix(p) + KEY_RSTICK)
                 for (left in booleanArrayOf(true, false))
@@ -797,7 +832,7 @@ object ControllerMappings {
         TEXTURE_DUMP("pad.texdump.keycode", "Toggle Texture Dumping"),
         // Toggles the whole on-screen performance overlay (FPS/CPU/GPU/etc.) via
         // the same path as the on-screen OSD button, so the two stay in sync.
-        TOGGLE_OSD("pad.toggleosd.keycode", "Toggle Perf Stats (OSD)"),
+        TOGGLE_OSD("pad.toggleosd.keycode", "Cycle Perf Stats (OSD)"),
         FAST_FORWARD("pad.fastforward.keycode", "Fast Forward (hold)"),
         FAST_FORWARD_TOGGLE("pad.fastforwardtoggle.keycode", "Fast Forward (toggle)"),
         // Slow motion toggle (50% speed, native LimiterModeType::Slomo). DISABLED
@@ -824,6 +859,13 @@ object ControllerMappings {
         // MainActivityRuntime.gyroActive and are session-only, never persisted.
         GYRO_TOGGLE("pad.gyrotoggle.keycode", "Gyro On/Off (toggle)"),
         GYRO_HOLD("pad.gyrohold.keycode", "Gyro (hold to aim)"),
+        // Raises/drops the Android IME over the running game and routes what it types to the
+        // emulated USB keyboard (com.armsx2.input.SoftKeyboard). A hotkey rather than a setting
+        // because the point is to type WITHOUT pausing — anything reachable only from the menu
+        // would mean pausing to open chat. Only meaningful with Emulate USB Keyboard on.
+        // Appended last on purpose: hotkeys are persisted by ordinal (hotkeyForStickCode's
+        // index lookup), so inserting mid-enum would re-point everyone's existing bindings.
+        TOGGLE_KEYBOARD("pad.togglekeyboard.keycode", "On-Screen Keyboard (toggle)"),
     }
 
     // A hotkey is either a single button or a two-button combo. The main key is

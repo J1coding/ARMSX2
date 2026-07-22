@@ -227,6 +227,13 @@ static void vtlbGetLiveRegisterMasks(u32& gpr_bitmask, u32& fpr_bitmask)
 		if (arm64neon[i].inuse)
 			fpr_bitmask |= (1u << i);
 	}
+
+	// SL-13: the q25/q26 clamp-constant broadcasts are not allocator state,
+	// but when compile-time valid they must survive a backpatched slowmem
+	// thunk's C call like any live register — clamp sites after this access
+	// were compiled without re-materialization.
+	if (cop2ClampConstsValid())
+		fpr_bitmask |= (1u << NEON_RESERVED_COP2_CLAMPMAX) | (1u << NEON_RESERVED_COP2_CLAMPMIN);
 }
 
 // Emit a single fastmem load instruction and register backpatch info.
@@ -1592,21 +1599,34 @@ void recLQC2()
 	// save/reload, runtime VPU_STAT check, and cycle accounting.
 	cop2EmitConditionalSync(false, _vu0FinishMicro);
 
-	// addr = (rs + imm) & ~0xF
+	const bool useFastmem = CHECK_FASTMEM && !vtlb_IsFaultingPC(pc);
+
+	// S4-3 fastmem path: no iFlushCall — the allocator (caller-saved scalar
+	// GPRs, FPRC, NEON quads/FPRs) rides through, matching the GE-14 recLQ
+	// shape. Address before the const flush (keeps the const-Rs fold); only
+	// constants must be memory-visible for the fault-path C handler. The
+	// quad lands in RQSCRATCH (q30) — per-op scratch, never allocator-
+	// tracked, so no q0 detach is needed — and is stored to VU0.VF[ft]
+	// directly (ft's memory is current here: LQC2 is VF-cache-classifier-
+	// false, so recompileNextInstruction flushed the COP2 VF compile cache
+	// before this emitter ran, and VF regs are never EE-allocator-tracked).
+	if (useFastmem)
+	{
+		recComputeAddr();
+		armAsm->And(a64::w9, a64::w9, (u32)~0xF);
+		_flushConstRegs(true);
+		vtlbFastmemRead128(9, RQSCRATCH.GetCode());
+		if (_Rt_)
+			armAsm->Str(RQSCRATCH, armVU0Mem(&VU0.VF[_Rt_]));
+		return;
+	}
+
+	// Softmem: addr = (rs + imm) & ~0xF, then the legacy full-flush + q0
+	// shape (the C call clobbers caller-saved state anyway).
 	recComputeAddr();
 	armAsm->And(a64::w9, a64::w9, (u32)~0xF);
-
-	// Match recLQ/recSQ: spill constant tracking before the softmem C call
-	// can fire (vtlb_memRead128 may dispatch through an MMIO handler that
-	// reads cpuRegs). Redundant when cop2EmitConditionalSync already
-	// emitted FLUSH_INTERPRETER, harmless otherwise.
 	iFlushCall(FLUSH_CONSTANT_REGS);
-
-	const bool useFastmem = CHECK_FASTMEM && !vtlb_IsFaultingPC(pc);
-	if (useFastmem)
-		vtlbFastmemRead128(9, 0);
-	else
-		vtlbSoftmemRead128(9);
+	vtlbSoftmemRead128(9);
 
 	// Store 128-bit result to VU0.VF[rt] (COP2 ft field = rt field)
 	if (_Rt_)
@@ -1618,8 +1638,24 @@ void recSQC2()
 	// EEINST-gated VU0 sync — see recLQC2 above.
 	cop2EmitConditionalSync(false, _vu0FinishMicro);
 
-	// addr = (rs + imm) & ~0xF — allocator-aware (rs may still be live
-	// in a host reg if the sync above emitted nothing).
+	const bool useFastmem = CHECK_FASTMEM && !vtlb_IsFaultingPC(pc);
+
+	// S4-3 fastmem path: no iFlushCall — see recLQC2. The source quad is
+	// read from VU0.VF[ft] memory into RQSCRATCH (q30, never allocator-
+	// tracked): ft's memory is current because the VF compile cache was
+	// flushed (dirty writebacks emitted) before this emitter ran.
+	if (useFastmem)
+	{
+		recComputeAddr();
+		armAsm->And(a64::w9, a64::w9, (u32)~0xF);
+		_flushConstRegs(true);
+		armAsm->Ldr(RQSCRATCH, armVU0Mem(&VU0.VF[_Rt_]));
+		vtlbFastmemWrite128(9, RQSCRATCH.GetCode());
+		return;
+	}
+
+	// Softmem: addr = (rs + imm) & ~0xF — allocator-aware (rs may still be
+	// live in a host reg if the sync above emitted nothing).
 	recComputeAddr();
 	armAsm->And(a64::w9, a64::w9, (u32)~0xF);
 
@@ -1636,11 +1672,7 @@ void recSQC2()
 	// to the FPREG's memory slot, corrupting the FPREG.
 	armAsm->Ldr(a64::q0, armVU0Mem(&VU0.VF[_Rt_]));
 
-	const bool useFastmem = CHECK_FASTMEM && !vtlb_IsFaultingPC(pc);
-	if (useFastmem)
-		vtlbFastmemWrite128(9, 0);
-	else
-		vtlbSoftmemWrite128(9);
+	vtlbSoftmemWrite128(9);
 }
 
 } // namespace OpcodeImpl

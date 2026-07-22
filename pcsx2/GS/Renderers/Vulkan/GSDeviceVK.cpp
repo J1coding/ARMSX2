@@ -907,7 +907,7 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 	// texture-rebind stall with push descriptors on Turnip (RP6), and a descriptor-set
 	// fallback regression on the proprietary driver (8 Elite), so it allowed only the
 	// proprietary driver. That Turnip measurement was of the OLD backend's binding code;
-	// with this backend the yaps2 line has always shipped push descriptors on Turnip
+	// this backend has always shipped push descriptors on Turnip
 	// (Adreno 610/650) and outperforms the fallback there. Allow the two drivers we have
 	// evidence for; keep the conservative disable only for an unknown Adreno driver.
 	if (m_use_push_descriptors && properties2.properties.vendorID == 0x5143u &&
@@ -920,7 +920,7 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 	// The Adreno PROPRIETARY driver mis-selects the provoking vertex with
 	// VK_EXT_provoking_vertex (Eden strips it on Qualcomm); drop it there so GSRendererHW's
 	// software provoking-vertex-first path runs instead. Turnip keeps the extension: the
-	// yaps2 line shipped it on Turnip with no flat-shading reports, and the SW fallback
+	// this backend has shipped it on Turnip with no flat-shading reports, and the SW fallback
 	// costs GS-thread CPU per flat-shaded batch.
 	if (m_optional_extensions.vk_ext_provoking_vertex && properties2.properties.vendorID == 0x5143u &&
 		m_device_driver_properties.driverID == VK_DRIVER_ID_QUALCOMM_PROPRIETARY)
@@ -2826,6 +2826,16 @@ GSDevice::PresentResult GSDeviceVK::BeginPresent(bool frame_skip)
 			if (!m_swap_chain->RecreateSurface(m_window_info))
 			{
 				Console.Error("VK: Failed to recreate surface after loss");
+				// Do NOT keep the half-dead swap chain and retry the inline recreate:
+				// after a surface loss the native window can still be held by the old
+				// surface (stock Qualcomm Adreno returns NATIVE_WINDOW_IN_USE from
+				// vkCreateSwapchainKHR on the same ANativeWindow), so RecreateSurface
+				// fails again every frame and the game relaunch stays black forever
+				// (#380 / #374; Turnip tolerates it and recovers, stock Adreno does
+				// not). Drop the swap chain entirely so the next onNativeSurfaceChanged
+				// -> MTGS::UpdateDisplayWindow -> UpdateWindow rebuilds from the genuinely
+				// fresh surface instead of hammering the in-use one.
+				DestroySurface();
 				ExecuteCommandBuffer(false);
 				return PresentResult::FrameSkipped;
 			}

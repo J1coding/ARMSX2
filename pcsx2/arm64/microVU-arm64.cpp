@@ -672,8 +672,9 @@ static void mVUdispatcherAB(mV)
 	a64::Label cleanUpReturn, cleanUpResetTail, eeSkipDone;
 
 	// (1) Cycle accounting — runs on BOTH paths (normal and reset), so it MUST
-	// precede the cache-bounds branch below. Unlike stock x86/ARMSX2 (whose
-	// C++ mVUcleanUp still carries this math), yaps2 inlined it here and trimmed
+	// precede the cache-bounds branch below. Unlike stock x86 and the
+	// pre-transplant line (whose C++ mVUcleanUp still carries this math), this
+	// backend inlined it here and trimmed
 	// it out of the helper — so if it ran only on the in-range path, a
 	// cache-exhaustion exit would drop the VU cycle credit entirely, leaving
 	// regs().cycle up to totalCycles below the EE clock and detonating the next
@@ -2099,6 +2100,16 @@ bool mVUTestProbe_VIPoolUsable(int hostreg, bool cop2mode)
 {
 	microVU0.regAlloc->reset(cop2mode);
 	const bool usable = microVU0.regAlloc->isUsableGPR(hostreg);
+	microVU0.regAlloc->reset(false);
+	return usable;
+}
+
+// SL-13 twin: is host NEON reg q<hostreg> in the VF allocation pool under
+// cop2mode? Macro mode must exclude q25/q26 (EE clamp-constant broadcasts).
+bool mVUTestProbe_NeonPoolUsable(int hostreg, bool cop2mode)
+{
+	microVU0.regAlloc->reset(cop2mode);
+	const bool usable = microVU0.regAlloc->isUsableNeon(hostreg);
 	microVU0.regAlloc->reset(false);
 	return usable;
 }

@@ -122,6 +122,10 @@ std::atomic<bool> s_execute_exit{false};
 // forever (the exit-game hang: EE breaks out, loop re-enters, repeat). Reset
 // at the top of runVMThread so a fresh launch starts clean.
 std::atomic<bool> s_stop_requested{false};
+// Set when setEnabledPatches had to CREATE gamesettings/<serial>_<CRC>.ini for a game
+// that booted without one: no LAYER_GAME is installed in that case, so reloadPatches
+// must reinstall it before the per-game Enable list can take effect.
+static std::atomic<bool> s_game_layer_needs_install{false};
 static std::mutex s_cpu_thread_mutex;
 static std::deque<std::function<void()>> s_cpu_thread_queue;
 static std::thread::id s_cpu_thread_id;
@@ -224,6 +228,16 @@ Java_kr_co_iefriends_pcsx2_NativeApp_setEeDiffVerify(JNIEnv*, jclass, jboolean e
     // defers safely to the dispatcher if a block is currently executing.
     if (Cpu)
         Cpu->Reset();
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_emulog(JNIEnv *env, jclass, jstring p_msg) {
+    // Route a Kotlin diagnostic line into the native Console so it lands in the emulog
+    // (the in-app Save Log export) — lets a handheld tester capture input logs with no PC.
+    const std::string msg = GetJavaString(env, p_msg);
+    if (!msg.empty())
+        Console.WriteLnFmt("{}", msg);
 }
 
 // Read the real flag so the UI can reflect it. The toggle previously kept its
@@ -917,6 +931,17 @@ Java_kr_co_iefriends_pcsx2_NativeApp_speedhackLimitermode(JNIEnv *env, jclass cl
 }
 
 extern "C"
+JNIEXPORT void JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_setTurboScalar(JNIEnv *env, jclass clazz, jfloat p_scalar) {
+    // Fast-forward speed multiplier for Turbo mode. The in-game FF-speed slider sets this just
+    // before engaging Turbo (speedhackLimitermode(1)); at the slider's top the UI uses Unlimited
+    // (mode 3) instead. Clamp mirrors EmulationSpeedOptions::ClampSpeed (0.05-10.0). SetLimiterMode
+    // reads TurboScalar when it recomputes the target speed, so setting this then re-issuing Turbo
+    // applies the new speed live.
+    EmuConfig.EmulationSpeed.TurboScalar = std::clamp(static_cast<float>(p_scalar), 0.05f, 10.0f);
+}
+
+extern "C"
 JNIEXPORT jboolean JNICALL
 Java_kr_co_iefriends_pcsx2_NativeApp_toggleTextureDumping(JNIEnv *env, jclass clazz) {
     // Runtime toggle of texture dumping — mirrors PCSX2's built-in
@@ -1014,6 +1039,15 @@ Java_kr_co_iefriends_pcsx2_NativeApp_setFpsCap(JNIEnv *env, jclass clazz,
     }
     GSSetMaxPresentFps(fps, interval);
     Console.WriteLnFmt("@@ANDROID_FPSCAP@@ fps={} interval_ticks={}", fps, interval);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_setPortraitRenderTop(JNIEnv*, jclass, jboolean top) {
+    // GitHub #375: top-align the render in a portrait window instead of vertical-centering,
+    // so the bottom is free for touch controls. Sets a GS static read live per-present;
+    // safe to call with or without a running VM.
+    GSSetPortraitRenderTopAlign(top == JNI_TRUE);
 }
 
 extern "C"
@@ -1399,7 +1433,14 @@ Java_kr_co_iefriends_pcsx2_NativeApp_reloadPatches(JNIEnv *env, jclass clazz) {
         return -1;
     }
 
-    VMManager::ReloadPatches(true, true, true, true);
+    // setEnabledPatches may have just CREATED gamesettings/<serial>_<CRC>.ini for a game
+    // that booted without one — no LAYER_GAME is installed then, so the per-game Enable
+    // list is invisible to ReloadEnabledLists. ReloadGameSettings re-reads the file,
+    // reinstalls the layer and reloads patches; it also runs ApplySettings, so only take
+    // that heavier path when the layer is actually missing.
+    if (!s_game_layer_needs_install.exchange(false, std::memory_order_acq_rel) ||
+        !VMManager::ReloadGameSettings())
+        VMManager::ReloadPatches(true, true, true, true);
     const u32 active_cheats = Patch::GetActiveCheatsCount();
     Console.WriteLnFmt("@@ANDROID_PNACH@@ reload active_cheats={}", active_cheats);
     return static_cast<jint>(active_cheats);
@@ -1565,6 +1606,22 @@ static std::vector<std::string> jStringArrayToVector(JNIEnv* env, jobjectArray a
 // selected subset: drop the game's names from the list then re-add the selected
 // ones (exact per-game state without disturbing other games), and Save so it
 // persists across reset/relaunch. Call reloadPatches() afterward to apply.
+
+// Per-game settings INI for the running game, or empty when there's no VM / no CRC
+// (Patch Manager opened from the library). Path computation is kept identical to
+// gameIniBeginWrite's so BOTH halves of the game layer — the EmuCore overrides and the
+// patch/cheat enable lists — land in the SAME file.
+static std::string AndroidGameSettingsPath() {
+    if (!VMManager::HasValidVM())
+        return {};
+    u32 crc = VMManager::GetDiscCRC();
+    if (crc == 0)
+        crc = VMManager::GetCurrentCRC();
+    if (crc == 0)
+        return {};
+    return VMManager::GetGameSettingsPath(VMManager::GetDiscSerial(), crc);
+}
+
 extern "C"
 JNIEXPORT void JNICALL
 Java_kr_co_iefriends_pcsx2_NativeApp_setEnabledPatches(
@@ -1574,6 +1631,55 @@ Java_kr_co_iefriends_pcsx2_NativeApp_setEnabledPatches(
     const char* section = (cheats == JNI_TRUE) ? "Cheats" : "Patches";
 
     auto lock = Host::GetSettingsLock();
+
+    // Scope to the running game. Upstream keys patch/cheat enable state on serial+CRC
+    // (FullscreenUI writes it to the game layer), and LayeredSettingsInterface returns the
+    // FIRST NON-EMPTY layer with LAYER_GAME ahead of LAYER_BASE — so a game-layer list
+    // fully shadows the base one. Writing to the base layer meant enabling e.g. "Widescreen
+    // 16:9" for one game auto-enabled the identically NAMED group in every other game,
+    // because Patch::EnablePatches matches purely by name.
+    const std::string game_ini = AndroidGameSettingsPath();
+    if (!game_ini.empty()) {
+        // Load-then-modify: this file ALSO carries the EmuCore per-game overrides written
+        // by gameIniCommitWrite, so it must never be regenerated from scratch here.
+        INISettingsInterface gsi_file(game_ini);
+        gsi_file.Load();
+        for (const auto& n : all)
+            gsi_file.RemoveFromStringList(section, "Enable", n.c_str());
+        for (const auto& n : enabled)
+            gsi_file.AddToStringList(section, "Enable", n.c_str());
+        Error error;
+        if (!gsi_file.Save(&error))
+            Console.ErrorFmt("@@ANDROID_PNACH@@ game ini save failed: {}", error.GetDescription());
+
+        // Mirror into the live in-memory game layer so the next ReloadEnabledLists sees the
+        // change without re-reading the file. Null when the game booted without an INI —
+        // flag that so reloadPatches installs the layer.
+        if (SettingsInterface* gsi = Host::Internal::GetGameSettingsLayer()) {
+            for (const auto& n : all)
+                gsi->RemoveFromStringList(section, "Enable", n.c_str());
+            for (const auto& n : enabled)
+                gsi->AddToStringList(section, "Enable", n.c_str());
+        } else {
+            s_game_layer_needs_install.store(true, std::memory_order_release);
+        }
+
+        // Migration + fall-through guard in one. GetStringList falls through to LAYER_BASE
+        // when the game layer's list is EMPTY, so a user who disables every cheat for game
+        // B would see game A's global names reappear. Dropping these names from the base
+        // list retires the legacy global state and closes that hole.
+        if (SettingsInterface* base = Host::Internal::GetBaseSettingsLayer()) {
+            bool changed = false;
+            for (const auto& n : all)
+                changed |= base->RemoveFromStringList(section, "Enable", n.c_str());
+            if (changed)
+                base->Save();
+        }
+        return;
+    }
+
+    // No VM / no CRC (Patch Manager opened from the library): base layer, which is what the
+    // pre-boot browser has always targeted.
     SettingsInterface* si = Host::Internal::GetBaseSettingsLayer();
     if (!si)
         return;
@@ -1924,6 +2030,17 @@ void Host::BeginPresentFrame() {
 
 void Host::OnGameChanged(const std::string& title, const std::string& elf_override, const std::string& disc_path,
                          const std::string& disc_serial, u32 disc_crc, u32 current_crc) {
+    // Free-software / anti-resale notice on each game boot, rendered through PCSX2's own OSD (the
+    // same message system + renderer as the FPS/stats overlay) so it reads as a native emulator
+    // pop-up rather than an Android layer drawn on top. Keyed so a re-fire just refreshes the one
+    // message. Guarded on a real game loading — OnGameChanged also fires with everything empty on
+    // shutdown/eject.
+    if (current_crc != 0 || !disc_path.empty() || !title.empty()) {
+        Host::AddKeyedOSDMessage("armsx2_free_software_notice",
+            "You are using ARMSX2, and it should not be sold, or distributed as part of any other "
+            "app. If you paid for this app, you should get your money back.",
+            10.0f);
+    }
 }
 
 void Host::PumpMessagesOnCPUThread() {
@@ -1975,6 +2092,45 @@ bool FileSystem::CreateDirectoryViaJava(const char* path)
     // Called many times during folder-card use, so free every local ref and clear
     // any pending JNI exception on all paths — the Java side swallows its own, but
     // a JNI-layer throw must not leak a local ref or an exception onto the next call.
+    bool ok = false;
+    jstring j_path = env->NewStringUTF(path);
+    if (j_path != nullptr)
+    {
+        ok = (env->CallStaticBooleanMethod(NativeApp, mid, j_path) == JNI_TRUE);
+        if (env->ExceptionCheck())
+        {
+            env->ExceptionClear();
+            ok = false;
+        }
+        env->DeleteLocalRef(j_path);
+    }
+    env->DeleteLocalRef(NativeApp);
+    return ok;
+}
+
+bool FileSystem::CreateFileViaJava(const char* path)
+{
+    // Bridges to NativeApp.createFilePath (java.io.File.createNewFile). Fallback
+    // when libc fopen(O_CREAT) is denied on FUSE-emulated external storage; once
+    // the empty file exists the native truncating write that follows succeeds,
+    // which is what makes NEW folder-card saves work on a custom data folder.
+    // Mirrors CreateDirectoryViaJava above; same local-ref/exception discipline.
+    auto* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
+    if (env == nullptr)
+        return false;
+    jclass NativeApp = env->FindClass("kr/co/iefriends/pcsx2/NativeApp");
+    if (NativeApp == nullptr)
+    {
+        env->ExceptionClear();
+        return false;
+    }
+    jmethodID mid = env->GetStaticMethodID(NativeApp, "createFilePath", "(Ljava/lang/String;)Z");
+    if (mid == nullptr)
+    {
+        env->ExceptionClear();
+        env->DeleteLocalRef(NativeApp);
+        return false;
+    }
     bool ok = false;
     jstring j_path = env->NewStringUTF(path);
     if (j_path != nullptr)
@@ -2183,6 +2339,20 @@ Java_kr_co_iefriends_pcsx2_NativeApp_resume(JNIEnv *env, jclass clazz) {
             VMManager::SetPaused(false);
     });
     Console.WriteLn("@@ANDROID_RESUME@@ queued state=%d", static_cast<int>(VMManager::GetState()));
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_setOutputPauseSuppressed(JNIEnv *env, jclass clazz, jboolean suppressed) {
+    // Set by pauseForOverlay(true) right before the in-game menu pauses the VM: while
+    // suppressed, SPU2::SetOutputPaused() is a no-op so the audio device keeps running
+    // (underrunning to silence — no audible artifact) instead of being paused. A paused
+    // low-latency AAudio stream is what Android reclaims when idle, forcing a full
+    // Close/Open rebuild on resume — the ~1s fast-forward-from-menu hitch, and the
+    // "audio dies a few seconds into a paused menu" bug (#333). Keeping it alive across
+    // the brief menu pause means resume is a cheap no-op with no rebuild. Only the
+    // overlay pause sets this; background/quit pause normally, and resume() clears it.
+    SPU2::SetOutputPauseSuppressed(suppressed == JNI_TRUE);
 }
 
 extern "C"
@@ -2783,7 +2953,17 @@ void Host::RequestVMShutdown(bool allow_confirm, bool allow_save_state, bool def
 
 void Host::OnAchievementsLoginSuccess(const char* username, u32 points, u32 sc_points, u32 unread_messages)
 {
-    // noop
+    // Cache the account score so the RA panels can show it even with no game loaded. The
+    // persistent rc_client (and thus rc_client_get_user_info, which is where GetAchievementsAsJSON
+    // normally reads the score) is null until a game WITH achievements loads — so before that the
+    // library / in-game RA menu had no score to show and hid the points chip. Persist it beside
+    // the token in secrets so it survives a restart; GetAchievementsAsJSON falls back to it.
+    if (s_secrets_settings_interface)
+    {
+        s_secrets_settings_interface->SetIntValue("Achievements", "LastScore", static_cast<int>(points));
+        s_secrets_settings_interface->SetIntValue("Achievements", "LastScoreSoftcore", static_cast<int>(sc_points));
+        s_secrets_settings_interface->Save();
+    }
 }
 
 void Host::OnAchievementsLoginRequested(Achievements::LoginRequestReason reason)
@@ -3373,6 +3553,27 @@ Java_kr_co_iefriends_pcsx2_NativeApp_osdApplyFlags(JNIEnv*, jclass,
 // next boot via UpdateGameSettingsLayer.
 static std::unique_ptr<INISettingsInterface> s_export_game_ini;
 
+// The [sections] applyTo() owns and fully regenerates on each per-game write. We LOAD the
+// existing file and clear only these, rather than starting from a FRESH (unloaded) interface:
+// a fresh start dropped every FOREIGN key in the file, most visibly the [Patches]/[Cheats]
+// "Enable" lists written by setEnabledPatches, so changing ANY in-game setting silently wiped
+// that game's enabled patches. Clearing just the sections we own still drops stale overrides
+// (the original intent) while leaving anything we don't own alone — robust for future keys too.
+static constexpr const char* OWNED_GAME_INI_SECTIONS[] = {
+    "EmuCore", "EmuCore/CPU", "EmuCore/CPU/Recompiler", "EmuCore/GS",
+    "EmuCore/Gamefixes", "EmuCore/Speedhacks", "Framerate", "MemoryCards",
+};
+
+// Open [path] as the active export interface for the gameIniPut/gameIniCommitWrite stream that
+// follows: load what's there (so foreign keys survive), then blank the sections we regenerate.
+static void BeginGameIniExport(const std::string& path) {
+    auto ini = std::make_unique<INISettingsInterface>(path);
+    ini->Load(); // failure just means there was no file yet, i.e. nothing to preserve
+    for (const char* sec : OWNED_GAME_INI_SECTIONS)
+        ini->ClearSection(sec);
+    s_export_game_ini = std::move(ini);
+}
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_kr_co_iefriends_pcsx2_NativeApp_gameIniBeginWrite(JNIEnv*, jclass) {
     if (!VMManager::HasValidVM())
@@ -3385,10 +3586,34 @@ Java_kr_co_iefriends_pcsx2_NativeApp_gameIniBeginWrite(JNIEnv*, jclass) {
         crc = VMManager::GetCurrentCRC();
     if (crc == 0)
         return JNI_FALSE;
-    // Fresh interface (no Load) so the export is a clean regeneration of the
-    // current overrides — stale keys from a previous save never linger.
-    s_export_game_ini = std::make_unique<INISettingsInterface>(
-        VMManager::GetGameSettingsPath(VMManager::GetDiscSerial(), crc));
+    BeginGameIniExport(VMManager::GetGameSettingsPath(VMManager::GetDiscSerial(), crc));
+    return JNI_TRUE;
+}
+
+// VM-less variant: rewrite a game's per-game INI when NOTHING is running — the case behind the
+// per-game "Reset" not sticking from the library. With no VM there is no disc CRC to build the
+// <serial>_<CRC>.ini name, and the file only exists at all if the user previously changed a
+// setting IN-GAME (that's the sole writer). So glob by serial: a match means a stale override
+// file the JSON prune couldn't reach, which we rewrite from the post-reset settings the Kotlin
+// stream puts next; no match means there is nothing to shadow global and JNI_FALSE tells Kotlin
+// to skip the (now unnecessary) put/commit.
+extern "C" JNIEXPORT jboolean JNICALL
+Java_kr_co_iefriends_pcsx2_NativeApp_gameIniBeginWriteForSerial(JNIEnv* env, jclass, jstring p_serial) {
+    if (!p_serial)
+        return JNI_FALSE;
+    const char* serial_c = env->GetStringUTFChars(p_serial, nullptr);
+    const std::string serial = serial_c ? serial_c : "";
+    if (serial_c) env->ReleaseStringUTFChars(p_serial, serial_c);
+    if (serial.empty())
+        return JNI_FALSE;
+    FileSystem::FindResultsArray results;
+    FileSystem::FindFiles(EmuFolders::GameSettings.c_str(),
+        fmt::format("{}_*.ini", Path::SanitizeFileName(serial)).c_str(),
+        FILESYSTEM_FIND_FILES, &results);
+    if (results.empty())
+        return JNI_FALSE;
+    // A serial normally has exactly one CRC-keyed file; rewrite that one.
+    BeginGameIniExport(results.front().FileName);
     return JNI_TRUE;
 }
 
@@ -3415,8 +3640,16 @@ Java_kr_co_iefriends_pcsx2_NativeApp_gameIniCommitWrite(JNIEnv*, jclass) {
         return JNI_FALSE;
     Error error;
     bool ok = true;
+
+    // The [Patches]/[Cheats] enable lists are preserved by gameIniBeginWrite loading the file
+    // instead of starting fresh; nothing to carry over here. Log what actually survives so a
+    // "my patches vanished" report can be diagnosed from an emulog instead of guesswork.
+    const size_t kept_patches = s_export_game_ini->GetStringList("Patches", "Enable").size();
+    const size_t kept_cheats = s_export_game_ini->GetStringList("Cheats", "Enable").size();
+
     s_export_game_ini->RemoveEmptySections();
-    if (s_export_game_ini->IsEmpty()) {
+    const bool empty = s_export_game_ini->IsEmpty();
+    if (empty) {
         // No per-game overrides — remove the file entirely (FullscreenUI parity).
         const std::string fn = s_export_game_ini->GetFileName();
         if (FileSystem::FileExists(fn.c_str()))
@@ -3424,6 +3657,8 @@ Java_kr_co_iefriends_pcsx2_NativeApp_gameIniCommitWrite(JNIEnv*, jclass) {
     } else {
         ok = s_export_game_ini->Save(&error);
     }
+    Console.WriteLnFmt("@@ANDROID_GAMEINI@@ commit {} patches={} cheats={}",
+        empty ? "removed" : "saved", kept_patches, kept_cheats);
     s_export_game_ini.reset();
     if (!ok)
         Console.ErrorFmt("@@ANDROID_GAMEINI@@ commit failed: {}", error.GetDescription());

@@ -621,6 +621,7 @@ static void _DynGen_Dispatchers()
 #if FPU_GUARD_MASK_STUB
 	g_fpuGuardMaskStub = _DynGen_FpuGuardMaskStub();
 #endif
+	cop2DynGenSyncStubs();
 
 	JITCompile = _DynGen_JITCompile();
 	EnterRecompiledCode = _DynGen_EnterRecompiledCode();
@@ -670,6 +671,12 @@ void iFlushCall(int flushtype)
 	// SetBranch* fork tails restore the compile-time state afterwards
 	// (Cop2VfCacheScope) so each fork emits its own writebacks.
 	cop2VfCacheFlush();
+
+	// SL-13: the callee may clobber the caller-saved q25/q26 clamp-constant
+	// broadcasts — pure compile-time invalidation (constants are clean by
+	// definition; the next clamp site re-materializes with 2 Dups).
+	// Unconditional on flushtype: ANY C call can clobber them.
+	cop2ClampConstsInvalidate();
 
 	// Free caller-saved registers
 	for (int i = 0; i < NUM_ARM_GPR_REGS; i++)
@@ -1612,10 +1619,12 @@ struct BranchCompileState
 	u32 blockCycles;
 	EEINST* instInfo;
 	Cop2VfCacheState vfCache;
+	bool clampConstsValid; // SL-13: q25/q26 broadcast validity at the fork point
 
 	void capture()
 	{
 		vfCache = cop2VfCacheGetState();
+		clampConstsValid = cop2ClampConstsValid();
 		blockCycles = s_nBlockCycles;
 		memcpy(constRegs, g_cpuConstRegs, sizeof(g_cpuConstRegs));
 		hasConstReg = g_cpuHasConstReg;
@@ -1628,6 +1637,7 @@ struct BranchCompileState
 	void restore() const
 	{
 		cop2VfCacheSetState(vfCache);
+		cop2ClampConstsSetValid(clampConstsValid);
 		s_nBlockCycles = blockCycles;
 		memcpy(g_cpuConstRegs, constRegs, sizeof(g_cpuConstRegs));
 		g_cpuHasConstReg = hasConstReg;
@@ -3135,31 +3145,8 @@ static bool eeScanInsnIsBranchClass(u32 code)
 // Scanner-side continuation gate for a conditional branch at `i` targeting
 // `target`. Forward-only (backward keeps the split/end logic), bounded, and
 // refuses a branch-class delay slot.
-static bool eeScanContinuable(u32 startpc, u32 i, u32 target, u32 famBit)
+static bool eeScanContinuable(u32 startpc, u32 i, u32 target)
 {
-	// Testing-only kill switch (offline A/B bisection of superblock formation):
-	// YAPS2_EESB is a bitmask of continuation-site families — bit0 BEQ/BNE,
-	// bit1 BLEZ/BGTZ, bit2 REGIMM BLTZ/BGEZ. Unset = all on; 0 = all off
-	// (reverts block formation to the pre-superblock shape without a rebuild).
-	// Not a production knob.
-	static const u32 s_sitesMask = []() -> u32 {
-		const char* e = std::getenv("YAPS2_EESB");
-		return e ? static_cast<u32>(std::atoi(e)) : 0xffu;
-	}();
-	if (!(s_sitesMask & famBit))
-		return false;
-	// Optional guest-pc window (hex), same offline-bisection purpose: only
-	// branches inside [YAPS2_EESB_LO, YAPS2_EESB_HI) become sites.
-	static const u32 s_siteLo = []() -> u32 {
-		const char* e = std::getenv("YAPS2_EESB_LO");
-		return e ? static_cast<u32>(std::strtoul(e, nullptr, 16)) : 0u;
-	}();
-	static const u32 s_siteHi = []() -> u32 {
-		const char* e = std::getenv("YAPS2_EESB_HI");
-		return e ? static_cast<u32>(std::strtoul(e, nullptr, 16)) : 0xffffffffu;
-	}();
-	if (i < s_siteLo || i >= s_siteHi)
-		return false;
 	return target > i + 4 &&
 		   s_numContSites < kMaxContSites &&
 		   ((i + 8 - startpc) / 4) < kMaxSuperblockInsns &&
@@ -3239,12 +3226,15 @@ static void recRecompile(const u32 startpc)
 	// and triggers SIGILL.
 	const uptr block_fnptr = (uptr)armGetCurrentCodePointer();
 
-	s_pCurBlockEx = recBlocks.Get(HWADDR(startpc));
-	if (!s_pCurBlockEx || s_pCurBlockEx->startpc != HWADDR(startpc))
-		s_pCurBlockEx = recBlocks.New(HWADDR(startpc), block_fnptr);
+	// New() both creates and re-binds: a startpc whose BASEBLOCKEX survived a
+	// straddled recClear is retargeted at the new code rather than left with
+	// a stale fnptr. It also publishes the block as the owner of every link
+	// site the emission below registers.
+	s_pCurBlockEx = recBlocks.New(HWADDR(startpc), block_fnptr);
 
 	g_branch = 0;
 	cop2VfCacheReset();
+	cop2ClampConstsInvalidate(); // SL-13: q25/q26 state unknown at block entry
 
 	s_pCurBlock->SetFnptr(block_fnptr);
 	s_nBlockCycles = 0;
@@ -3460,7 +3450,7 @@ static void recRecompile(const u32 startpc)
 					// SL-03: forward BLTZ/BGEZ (rt 0/1) become continuation
 					// sites — scan on at the fallthrough. Likely + AL forms
 					// keep ending the block.
-					if (_Rt_ < 2 && eeScanContinuable(startpc, i, _Imm_ * 4 + i + 4, 4u))
+					if (_Rt_ < 2 && eeScanContinuable(startpc, i, _Imm_ * 4 + i + 4))
 					{
 						s_contSitePcs[s_numContSites++] = i;
 						i += 8; // skip the delay slot word in the scan
@@ -3493,8 +3483,7 @@ static void recRecompile(const u32 startpc)
 				// idiom (always taken: everything after is unreachable on the
 				// fallthrough) and keeps ending the block.
 				if (!((cpuRegs.code >> 26) == 4 && _Rs_ == _Rt_) &&
-					eeScanContinuable(startpc, i, _Imm_ * 4 + i + 4,
-						(cpuRegs.code >> 26) < 6 ? 1u : 2u))
+					eeScanContinuable(startpc, i, _Imm_ * 4 + i + 4))
 				{
 					s_contSitePcs[s_numContSites++] = i;
 					i += 8; // skip the delay slot word in the scan
@@ -3940,29 +3929,7 @@ StartRecomp:
 	// SL-10: outline the side-exit bodies into the cold arena and patch the
 	// islands. Runs as its own emission session so the bodies land outside
 	// the hot compile-order stream.
-	const u8* coldDumpStart = s_coldPtr;
 	recEmitColdSideExits();
-
-	// Testing-only: YAPS2_EESB_DUMP=<hex guest pc> dumps the emitted host code
-	// (including the literal pool, post-finalize so offsets are patched) of any
-	// block whose guest range covers that pc (offline bisection aid).
-	{
-		static const u32 s_dumpPc = []() -> u32 {
-			const char* e = std::getenv("YAPS2_EESB_DUMP");
-			return e ? static_cast<u32>(std::strtoul(e, nullptr, 16)) : 0u;
-		}();
-		if (s_dumpPc && startpc <= s_dumpPc && s_dumpPc < s_nEndBlock)
-		{
-			fprintf(stderr, "EESB_DUMP: block %08x..%08x fnptr=%p size=%u endptr=%p sites=%d cold=%p+%u\n",
-				startpc, s_nEndBlock, (void*)s_pCurBlockEx->fnptr, s_pCurBlockEx->x86size,
-				(void*)recPtr, s_numContSites,
-				(void*)coldDumpStart, static_cast<u32>(s_coldPtr - coldDumpStart));
-			armDisassembleAndDumpCode((void*)s_pCurBlockEx->fnptr,
-				static_cast<size_t>((uptr)recPtr - (uptr)s_pCurBlockEx->fnptr));
-			if (s_coldPtr != coldDumpStart)
-				armDisassembleAndDumpCode(coldDumpStart, static_cast<size_t>(s_coldPtr - coldDumpStart));
-		}
-	}
 
 	pxAssert((g_cpuHasConstReg & g_cpuFlushedConstReg) == g_cpuHasConstReg);
 

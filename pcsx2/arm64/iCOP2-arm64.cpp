@@ -10,6 +10,8 @@
 
 #include "VUmicro.h" // CpuVU0 — VE-08 thin sync helpers
 
+#include "common/Assertions.h"
+
 namespace a64 = vixl::aarch64;
 
 // ========================================================================
@@ -83,9 +85,10 @@ alignas(16) static const u32 s_cop2DestMasks[16][4] = {
 // tiny compile-time cache keeps them resident in q16..q20 and the op bodies
 // compute 3-operand NEON straight from the cache registers.
 //
-// Register choice: q16-q26 have no fixed user in EE-block emission context
+// Register choice: q16-q24 have no fixed user in EE-block emission context
 // (q0-q7 = allocator temp/FPR first-fit + vtlb data + mVU macro window,
 // q8/q9 = pinned FPU clamp constants, q10-q15 = allocator GPR-quad/FPR homes,
+// q25/q26 = SL-13 clamp-constant broadcasts (cop2EnsureClampConsts below),
 // q27/q28 = VOPMULA/VCLIP + flag-body scratch, q29-q31 = per-op scratch).
 // They are caller-saved and NOT preserved by the fastmem fault thunk (which
 // only saves allocator-tracked regs), so the cache must never survive any op
@@ -466,8 +469,12 @@ static_assert(offsetof(cpuRegistersPack, cop2Rec) + sizeof(EeCop2RecState) <= 16
 
 // (Re)write the pack copies of the COP2 rec constants. Called from
 // recResetRaw, so the harnesses that reset the rec before compiling are
-// covered too. minFloat is the pre-negated clamp lower bound: the clamp
-// emitters spend a 1-insn load where they used to spend an Fneg.
+// covered too. minFloat is the pre-negated clamp lower bound. Since SL-13
+// the clamp emitters no longer LOAD maxFloat/minFloat (the bounds live
+// broadcast in q25/q26, re-materialized from s8/s9 — see
+// cop2EnsureClampConsts below); the pack fields stay as the documented
+// canonical values (minFloat[i] == maxFloat[i] | 0x80000000 == -FLT_MAX is
+// the identity the s9 Dup relies on) and for any future dest-mask work.
 void cop2RecWritePackConstants()
 {
 	EeCop2RecState& st = _cpuRegistersPack.cop2Rec;
@@ -479,15 +486,80 @@ void cop2RecWritePackConstants()
 	st.denormStatusFlag = 0;
 }
 
+// =========================================================================
+//  SL-13: clamp-constant broadcast residency (q25/q26)
+// =========================================================================
+// The clamp bounds live register-resident: q25 = maxFloat.4S (+FLT_MAX per
+// lane), q26 = minFloat.4S (-FLT_MAX per lane). Both are excluded from the
+// EE NEON allocator pool (NEON_RESERVED_COP2_CLAMPMAX/MIN, iCore-arm64.cpp)
+// and from the COP2 macro-mode mVU pool (microRegAlloc::reset(cop2mode)), so
+// no EE-block emission can clobber them. Re-materialization is 2 Dups from
+// the pinned s8 = +FLT_MAX / s9 = -FLT_MAX callee-saved scalars
+// (_DynGen_EnterRecompiledCode) — no memory access, and the sources survive
+// every C call by AAPCS64. minFloat[i] == maxFloat[i] | 0x80000000 ==
+// -FLT_MAX exactly (see cop2RecWritePackConstants), so s9 is the exact
+// broadcast source.
+//
+// Compile-time validity discipline (s_cop2ClampConstsValid):
+//  - false at block start; the first clamp site emits the 2 Dups.
+//  - iFlushCall (ANY flushtype — every real C-call seam) invalidates: the
+//    callee may clobber caller-saved q25/q26. The next clamp site re-Dups.
+//  - The VPU_STAT-conditional sync seams do NOT invalidate: the shared sync
+//    stubs re-Dup unconditionally on their taken path after the C calls
+//    (always sound — q25/q26 can hold nothing else), and their fast path
+//    touches no NEON.
+//  - Fastmem sites do NOT invalidate: vtlbGetLiveRegisterMasks ORs q25/q26
+//    into the recorded fpr_bitmask while valid, so a backpatched slowmem
+//    thunk save/restores them around its C call like any live register.
+//  - The mVU-reuse macro wrappers do NOT invalidate: their pool excludes
+//    q25/q26 under cop2mode and they emit no C calls.
+//  - Branch forks and superblock side exits snapshot/restore the flag via
+//    BranchCompileState (iR5900-arm64.cpp).
+// Establishment must stay on unconditionally-executed emission paths — never
+// emit the Dups inside a runtime-conditional arm (a post-merge site compiled
+// valid would be wrong on the arm that skipped them). All current clamp
+// sites are straight-line within their op bodies.
+
+static bool s_cop2ClampConstsValid = false;
+
+#ifdef PCSX2_RECOMPILER_TESTS
+u32 g_cop2ClampConstEstablishCount = 0;
+#endif
+
+bool cop2ClampConstsValid()
+{
+	return s_cop2ClampConstsValid;
+}
+
+void cop2ClampConstsSetValid(bool valid)
+{
+	s_cop2ClampConstsValid = valid;
+}
+
+void cop2ClampConstsInvalidate()
+{
+	s_cop2ClampConstsValid = false;
+}
+
+static void cop2EnsureClampConsts()
+{
+	if (s_cop2ClampConstsValid)
+		return;
+	armAsm->Dup(a64::v25.V4S(), a64::v8.V4S(), 0); // +FLT_MAX broadcast
+	armAsm->Dup(a64::v26.V4S(), a64::v9.V4S(), 0); // -FLT_MAX broadcast
+	s_cop2ClampConstsValid = true;
+#ifdef PCSX2_RECOMPILER_TESTS
+	g_cop2ClampConstEstablishCount++;
+#endif
+}
+
 // Clamp the result register to [-FLT_MAX, +FLT_MAX] (removes infinities and
 // NaNs). FMINNM/FMAXNM match x86 MINPS/MAXPS semantics: NaN → non-NaN operand.
 static void cop2ClampResultReg(const a64::VRegister& result)
 {
-	armAsm->Ldr(RQSCRATCH2, armCpuRegMem(&_cpuRegistersPack.cop2Rec.maxFloat));
-	armAsm->Ldr(RQSCRATCH3, armCpuRegMem(&_cpuRegistersPack.cop2Rec.minFloat));
-
-	armAsm->Fminnm(result.V4S(), result.V4S(), RQSCRATCH2.V4S()); // clamp to +FLT_MAX
-	armAsm->Fmaxnm(result.V4S(), result.V4S(), RQSCRATCH3.V4S()); // clamp to -FLT_MAX
+	cop2EnsureClampConsts();
+	armAsm->Fminnm(result.V4S(), result.V4S(), a64::v25.V4S()); // clamp to +FLT_MAX
+	armAsm->Fmaxnm(result.V4S(), result.V4S(), a64::v26.V4S()); // clamp to -FLT_MAX
 }
 
 static void cop2ClampResult()
@@ -495,28 +567,14 @@ static void cop2ClampResult()
 	cop2ClampResultReg(RQSCRATCH);
 }
 
-// Single-temp variant of cop2ClampReg: clamps `qreg` to [-FLT_MAX, +FLT_MAX]
-// using just one scratch register (it reloads the bound between the two
-// clamps). Needed when pre-clamping a broadcast FMAC operand, where Fs/Ft
-// already occupy two of the three q-scratch regs and only one is free.
-static void cop2ClampRegOneTmp(const a64::VRegister& qreg, const a64::VRegister& tmp)
-{
-	armAsm->Ldr(tmp, armCpuRegMem(&_cpuRegistersPack.cop2Rec.maxFloat));
-	armAsm->Fminnm(qreg.V4S(), qreg.V4S(), tmp.V4S()); // clamp to +FLT_MAX
-	armAsm->Ldr(tmp, armCpuRegMem(&_cpuRegistersPack.cop2Rec.minFloat));
-	armAsm->Fmaxnm(qreg.V4S(), qreg.V4S(), tmp.V4S()); // clamp to -FLT_MAX
-}
-
 // Non-destructive clamp: dst = clamp(src) without modifying src (which may be
-// a live VF-cache register). Same 4-insn cost as cop2ClampRegOneTmp — the
-// first Fminnm is 3-operand, so preserving src is free.
-static void cop2ClampInto(const a64::VRegister& dst, const a64::VRegister& src,
-	const a64::VRegister& tmp)
+// a live VF-cache register) — the first Fminnm is 3-operand, so preserving
+// src is free.
+static void cop2ClampInto(const a64::VRegister& dst, const a64::VRegister& src)
 {
-	armAsm->Ldr(tmp, armCpuRegMem(&_cpuRegistersPack.cop2Rec.maxFloat));
-	armAsm->Fminnm(dst.V4S(), src.V4S(), tmp.V4S());
-	armAsm->Ldr(tmp, armCpuRegMem(&_cpuRegistersPack.cop2Rec.minFloat));
-	armAsm->Fmaxnm(dst.V4S(), dst.V4S(), tmp.V4S());
+	cop2EnsureClampConsts();
+	armAsm->Fminnm(dst.V4S(), src.V4S(), a64::v25.V4S());
+	armAsm->Fmaxnm(dst.V4S(), dst.V4S(), a64::v26.V4S());
 }
 
 // ========================================================================
@@ -960,18 +1018,18 @@ void vu0SyncRunAheadThin()
 
 // SL-2: seam preparation for the conditional VU0 sync below — the retain
 // variant of iFlushCall(FLUSH_FREE_XMM | FLUSH_FREE_VU0) these sites used to
-// pay. The C call sits behind the runtime VPU_STAT Tbz (VU0 idle in the
+// pay. The C call sits behind the runtime VPU_STAT check (VU0 idle in the
 // steady state), so evicting the whole caller-saved allocator on the
 // UNCONDITIONAL path threw away residency the common path never had to lose:
 //
 //  - GPR/FPRC entries (incl. the loop-resident pins and block-resident
-//    FCR31): written back but KEPT mapped (_flushArm64GPRregs writeback-keep)
-//    — memory is current for anything the callee might read, values stay in
-//    registers on the skip path, and the sync path reloads them via
-//    cop2ReloadRetainedAfterSync() inside the conditional. The VU0-sync
-//    callees (vu0SyncThin/RunAheadThin/_vu0FinishMicro → CpuVU0->Execute)
-//    have no path that writes EE GPRs or fprc, so the retained mapping can't
-//    go stale.
+//    FCR31): KEPT mapped with NO writeback (S4-2). The shared sync stub
+//    raw-preserves the caller-saved pool registers around the C calls, so
+//    the values survive both paths in-register. Sound for the same reason
+//    the old writeback-keep + reload was: the VU0-sync callees
+//    (vu0SyncThin/RunAheadThin/_vu0FinishMicro/_vu0WaitMicro →
+//    CpuVU0->Execute) have no path that reads OR writes EE GPRs or fprc —
+//    stale canonical memory during the call is unobservable.
 //  - VIREG entries are freed WITH writeback: VU0 execution writes VU0.VI, so
 //    a retained VI mirror would go stale across the call.
 //  - TEMP / PCWRITEBACK entries are freed (transient, no reloadable home).
@@ -993,24 +1051,122 @@ static void cop2FlushForConditionalSync()
 		if (!arm64gprs[i].inuse || armIsCalleeSavedRegister(i))
 			continue;
 		if (arm64gprs[i].type == ARM64TYPE_GPR || arm64gprs[i].type == ARM64TYPE_FPRC)
-			continue; // retained — writeback-keep below
+			continue; // retained — the sync stub raw-preserves the pool regs
 		_freeArm64GPR(i); // VIREG (writeback) / TEMP / PCWRITEBACK
 	}
-
-	_flushArm64GPRregs(); // writeback-keep the retained entries
 }
 
-// Reload the retained caller-saved entries after the sync C call. Emitted
-// INSIDE the Tbz conditional, after the pin reload — the skip path never
-// clobbered them.
-static void cop2ReloadRetainedAfterSync()
+// =========================================================================
+//  S4-2: shared DynGen VU0-sync stubs
+// =========================================================================
+// The seam body (VPU_STAT gate + cycle flush/reload + pin flush/reload +
+// the C calls) used to be re-emitted inline at EVERY analysis-marked COP2
+// site — 15-25 insns each, the fattest per-site byte carrier in COP2-dense
+// hot blocks (S4 icache ledger). AetherSX2 4248 emits it ONCE per recResetEE
+// and BLs to it from a 3-insn site (mVUmacroEmitCOP2_0/1 → the 0x2a506d8
+// stub family); this is that shape. Per-site cost is now Add-cycles + BL.
+//
+// Contract (site side): emitted only after cop2FlushForConditionalSync(),
+// with retained GPR/FPRC entries still mapped in the caller-saved pool regs.
+// Clobbers x8 and x16/x17 (like any BL); preserves everything else on both
+// paths. Relies on the EE-block pinned bases (RSTATE, RECCYCLE, x24=&VU0)
+// being live — callable only from EE recompiled code.
+//
+// Fast path (VPU_STAT bit 0 clear — VU0 idle): Ldr + Tbnz + Ret.
+// Sync path: raw-save LR + the caller-saved EE int-allocator pool regs
+// (x4-x7/x14/x15 — where retained GPR/FPRC values live), publish the
+// absolute cycle, flush the lazy-dirty caller-saved pins, run the sync
+// callee(s), re-derive the cycle delta, reload pins, restore, Ret.
+
+enum : int
 {
-	for (int i = 0; i < NUM_ARM_GPR_REGS; i++)
-	{
-		if (arm64gprs[i].inuse && !armIsCalleeSavedRegister(i))
-			_reloadArm64GPR(i);
-	}
+	kCop2SyncStubSyncFinish, // vu0SyncThin + _vu0FinishMicro (interlocked op)
+	kCop2SyncStubSyncWait, // vu0SyncThin + _vu0WaitMicro (interlocked QMTC2/CTC2)
+	kCop2SyncStubSyncExact, // vu0SyncThin (non-interlock sync in an interlocked block)
+	kCop2SyncStubSyncRunAhead, // vu0SyncRunAheadThin (non-interlock sync)
+	kCop2SyncStubFinish, // _vu0FinishMicro (finish-only)
+	kCop2SyncStubCount
+};
+static const u8* s_cop2SyncStubs[kCop2SyncStubCount];
+
+static const u8* cop2DynGenOneSyncStub(void (*syncFn)(), void (*finishFn)())
+{
+	const u8* start = armGetCurrentCodePointer();
+
+	a64::Label doSync;
+	armAsm->Ldr(RWSCRATCH, armVU0Mem(&VU0.VI[REG_VPU_STAT]));
+	armAsm->Tbnz(RWSCRATCH, 0, &doSync);
+	armAsm->Ret();
+
+	armAsm->Bind(&doSync);
+	armAsm->Stp(a64::x4, a64::x5, a64::MemOperand(a64::sp, -64, a64::PreIndex));
+	armAsm->Stp(a64::x6, a64::x7, a64::MemOperand(a64::sp, 16));
+	armAsm->Stp(a64::x14, a64::x15, a64::MemOperand(a64::sp, 32));
+	armAsm->Str(a64::x30, a64::MemOperand(a64::sp, 48));
+
+	// Publish the absolute cycle before the sync — the callees read
+	// cpuRegs.cycle to determine how many VU0 micro cycles to run — and
+	// flush the lazy-dirty caller-saved pins before the first call clobbers
+	// them (pairs with the reloads below).
+	armFlushCycleDelta();
+	armFlushEEClobberedPins();
+
+	if (syncFn)
+		armEmitCall((void*)syncFn);
+	if (finishFn)
+		armEmitCall((void*)finishFn);
+
+	// Re-derive the cycle delta (the callees advance cpuRegs.cycle and can
+	// reschedule nextEventCycle) and restore the caller-saved pins. The
+	// callees write VU state, not EE GPRs.
+	armReloadCycleDelta();
+	armReloadEEClobberedPins();
+
+	// SL-13: the callees (and any VU0 micro they ran) clobber caller-saved
+	// q25/q26 — re-materialize the clamp-constant broadcasts so sites whose
+	// compile-time validity rides through this seam stay correct. Always
+	// sound: q25/q26 are pool-reserved and can hold nothing else, and the
+	// s8/s9 sources are callee-saved (low 64 bits). The fast path above
+	// touches no NEON, so validity rides it untouched. Pinned by
+	// EeVu0Cop2ClampResidency.SyncStubsReDupClampConsts.
+	armAsm->Dup(a64::v25.V4S(), a64::v8.V4S(), 0);
+	armAsm->Dup(a64::v26.V4S(), a64::v9.V4S(), 0);
+
+	armAsm->Ldr(a64::x30, a64::MemOperand(a64::sp, 48));
+	armAsm->Ldp(a64::x14, a64::x15, a64::MemOperand(a64::sp, 32));
+	armAsm->Ldp(a64::x6, a64::x7, a64::MemOperand(a64::sp, 16));
+	armAsm->Ldp(a64::x4, a64::x5, a64::MemOperand(a64::sp, 64, a64::PostIndex));
+	armAsm->Ret();
+
+	return start;
 }
+
+void cop2DynGenSyncStubs()
+{
+	s_cop2SyncStubs[kCop2SyncStubSyncFinish] = cop2DynGenOneSyncStub(vu0SyncThin, _vu0FinishMicro);
+	s_cop2SyncStubs[kCop2SyncStubSyncWait] = cop2DynGenOneSyncStub(vu0SyncThin, _vu0WaitMicro);
+	s_cop2SyncStubs[kCop2SyncStubSyncExact] = cop2DynGenOneSyncStub(vu0SyncThin, nullptr);
+	s_cop2SyncStubs[kCop2SyncStubSyncRunAhead] = cop2DynGenOneSyncStub(vu0SyncRunAheadThin, nullptr);
+	s_cop2SyncStubs[kCop2SyncStubFinish] = cop2DynGenOneSyncStub(nullptr, _vu0FinishMicro);
+}
+
+#ifdef PCSX2_RECOMPILER_TESTS
+// SL-13 pin surface: emitted sync-stub code ranges, so tests can assert the
+// taken path re-materializes the q25/q26 clamp broadcasts (the seam-survival
+// invariant is emission-level — end-to-end runs only catch it when the C
+// path happens to clobber q25/q26). Kind indexes follow emission order; the
+// end of stub k is the start of stub k+1 (contiguous emission), and the last
+// stub is bounded by the dispatcher's Perf-registered range — tests scan to
+// the final Ret instead.
+int cop2TestGetSyncStubCount()
+{
+	return kCop2SyncStubCount;
+}
+const u8* cop2TestGetSyncStub(int kind)
+{
+	return (kind >= 0 && kind < kCop2SyncStubCount) ? s_cop2SyncStubs[kind] : nullptr;
+}
+#endif
 
 // Emit conditional VU0 sync: uses EEINST analysis flags when available,
 // falls back to runtime VPU_STAT check otherwise.
@@ -1030,44 +1186,22 @@ void cop2EmitConditionalSync(bool interlock, void (*finishFunc)())
 		if (g_pCurInstInfo->info & EEINST_COP2_SYNC_VU0)
 		{
 			// SL-2 retain seam (was iFlushCall(FLUSH_FREE_XMM|FLUSH_FREE_VU0)):
-			// writeback-keep GPR/FPRC, free NEON/VI/temps — see the helper.
+			// keep GPR/FPRC mapped, free NEON/VI/temps — see the helper.
 			cop2FlushForConditionalSync();
 
 			// Apply block cycles to RECCYCLE (the pinned cycle delta).
-			u32 cycles = scaleblockcycles_clear();
+			const u32 cycles = scaleblockcycles_clear();
 			if (cycles != 0)
 				armAsm->Add(RECCYCLE, RECCYCLE, cycles);
 
-			// Runtime: skip if VU0 not running
-			a64::Label skipSync;
-			armAsm->Ldr(RWSCRATCH, armVU0Mem(&VU0.VI[REG_VPU_STAT]));
-			armAsm->Tbz(RWSCRATCH, 0, &skipSync);
-
-			// Flush the absolute cycle before the sync — it reads
-			// cpuRegs.cycle to determine how many VU0 micro cycles to run.
-			// Re-derive after, since the sync may advance cpuRegs.cycle and
-			// reschedule nextEventCycle.
-			armFlushCycleDelta();
-
-			// Lazy-dirty seam: flush BEFORE the first call of the sequence
-			// (the pins are clobbered from then on; pairs with the reload
-			// below). The iFlushCall above lacks FLUSH_ALL_X86, so the
-			// central hook didn't cover this.
-			armFlushEEClobberedPins();
-			armEmitCall((void*)vu0SyncThin);
-			if (finishFunc)
-			{
-				armEmitCall((void*)finishFunc);
-			}
-
-			armReloadCycleDelta();
-			// The sync callees write VU state, not EE GPRs; restore the
-			// caller-saved pins they clobbered. Inside the conditional — the
-			// skip path never made a call, so its pins are intact.
-			armReloadEEClobberedPins();
-			cop2ReloadRetainedAfterSync();
-
-			armAsm->Bind(&skipSync);
+			int stub = kCop2SyncStubSyncExact;
+			if (finishFunc == &_vu0FinishMicro)
+				stub = kCop2SyncStubSyncFinish;
+			else if (finishFunc == &_vu0WaitMicro)
+				stub = kCop2SyncStubSyncWait;
+			else
+				pxAssert(!finishFunc);
+			armEmitCall(s_cop2SyncStubs[stub]);
 		}
 		// else: analysis says no VU0 program between COP2 ops, safe to skip
 		return;
@@ -1083,40 +1217,21 @@ void cop2EmitConditionalSync(bool interlock, void (*finishFunc)())
 	// SL-2 retain seam — see the interlock branch above.
 	cop2FlushForConditionalSync();
 
-	u32 cycles = scaleblockcycles_clear();
+	const u32 cycles = scaleblockcycles_clear();
 	if (cycles != 0)
 		armAsm->Add(RECCYCLE, RECCYCLE, cycles);
 
-	// Runtime: skip if VU0 not running
-	a64::Label skipSync;
-	armAsm->Ldr(RWSCRATCH, armVU0Mem(&VU0.VI[REG_VPU_STAT]));
-	armAsm->Tbz(RWSCRATCH, 0, &skipSync);
-
-	// Flush + re-derive the cycle delta around the C call (see comment above).
-	armFlushCycleDelta();
-
-	// Lazy-dirty seam: flush before whichever call is emitted (pairs with the
-	// reload below; the lighter iFlushCall above didn't cover this).
-	armFlushEEClobberedPins();
 	if (needsSync)
 	{
 		// Non-interlocked catch-up: run a 16-cycle minimum to amortize the mVU
 		// dispatch envelope over small blocks (6dc5087cb). If the block also
 		// contains an interlocked op, fall back to the exact sync.
-		armEmitCall((void*)(s_nBlockInterlocked ? vu0SyncThin : vu0SyncRunAheadThin));
+		armEmitCall(s_cop2SyncStubs[s_nBlockInterlocked ? kCop2SyncStubSyncExact : kCop2SyncStubSyncRunAhead]);
 	}
 	else
 	{
-		armEmitCall((void*)_vu0FinishMicro);
+		armEmitCall(s_cop2SyncStubs[kCop2SyncStubFinish]);
 	}
-
-	armReloadCycleDelta();
-	// See the interlock branch above — same caller-saved pin restore, same
-	// inside-the-conditional placement.
-	armReloadEEClobberedPins();
-	cop2ReloadRetainedAfterSync();
-
-	armAsm->Bind(&skipSync);
 }
 
 namespace R5900 {
@@ -1124,63 +1239,112 @@ namespace Dynarec {
 namespace OpcodeImpl {
 
 // QMFC2: cpuRegs.GPR[rt] = VU0.VF[fs] (128-bit copy, VF → EE GPR)
+//
+// S4-1: allocator-routed, no block-wide flush (x86 recQMFC2 / AetherSX2
+// recQMFC2 shape — aether's transfer ops emit no flush at all in the
+// no-sync path; the only remaining flush point is the analysis-gated sync
+// seam inside cop2EmitConditionalSync). The old unconditional
+// iFlushCall(FLUSH_EVERYTHING) here was ~half the emitted bytes of every
+// COP2-heavy physics block (S4b: 23% of the #1 UYA block was q-class
+// GPR<->memory round-trips these seams forced).
 void recCOP2_QMFC2()
 {
-	iFlushCall(FLUSH_EVERYTHING);
 	cop2EmitConditionalSync(cpuRegs.code & 1, _vu0FinishMicro);
 
 	if (_Rt_ == 0) return;
-	GPR_DEL_CONST(_Rt_);
 
-	// 128-bit copy: VU0.VF[fs] → cpuRegs.GPR.r[rt]
-	armAsm->Ldr(RQSCRATCH, armVU0Mem(&VU0.VF[_Rd_]));
-	armStoreEEGPRQuad(RQSCRATCH, _Rt_);
+	if (EEINST_USEDTEST(_Rt_))
+	{
+		// rt is read again later: claim a NEON quad MODE_WRITE (frees any
+		// scalar slot / const without a pointless writeback — the full 128
+		// bits are overwritten) and load VF straight into it. The value
+		// stays q-resident for following MMI/QMTC2 consumers.
+		const int qd = _allocGPRtoNEONreg(_Rt_, MODE_WRITE);
+		armAsm->Ldr(armQRegister(qd), armVU0Mem(&VU0.VF[_Rd_]));
+	}
+	else
+	{
+		// Dead-after dest: store straight to the canonical image instead of
+		// occupying a quad slot (mirrors x86 _allocIfUsedGPRtoXMM's miss path).
+		_deleteEEreg128(_Rt_);
+		armAsm->Ldr(RQSCRATCH, armVU0Mem(&VU0.VF[_Rd_]));
+		armStoreEEGPRQuad(RQSCRATCH, _Rt_);
+	}
 }
 
 // QMTC2: VU0.VF[fs] = cpuRegs.GPR[rt] (128-bit copy, EE GPR → VF)
+//
+// S4-1: no block-wide flush (see recCOP2_QMFC2). Source policy mirrors x86
+// recQMTC2: force a quad FILL only when the newest rt lives where a raw
+// memory read can't see it (dirty const / dirty scalar slot — the fill path
+// materializes the const or Ins-merges the slot); otherwise serve from an
+// already-resident quad (an MMI result costs zero extra loads), and on a
+// clean miss read memory + merge the lazy pin WITHOUT claiming a slot —
+// a fresh alloc for a once-read source costs more (deferred writeback +
+// eviction pressure in q10-q15) than the 2-3-insn memory shape. Measured:
+// unconditional alloc grew several UYA physics blocks up to +120 B.
 void recCOP2_QMTC2()
 {
-	iFlushCall(FLUSH_EVERYTHING);
 	cop2EmitConditionalSync(cpuRegs.code & 1, _vu0WaitMicro);
 
 	if (_Rd_ == 0) return; // VF[0] is read-only
 
-	// 128-bit copy: cpuRegs.GPR.r[rt] → VU0.VF[fs]
-	if (GPR_IS_CONST1(_Rt_))
+	int qs;
+	if (GPR_IS_DIRTY_CONST(_Rt_) || _hasArm64GPR(ARM64TYPE_GPR, _Rt_, MODE_WRITE))
+		qs = _allocGPRtoNEONreg(_Rt_, MODE_READ);
+	else
+		qs = _checkNEONreg(NEONTYPE_GPRREG, _Rt_, MODE_READ);
+	if (qs >= 0)
 	{
-		armMoveAddressToReg(RSCRATCHADDR, &g_cpuConstRegs[_Rt_]);
-		armAsm->Ldr(RQSCRATCH, a64::MemOperand(RSCRATCHADDR));
+		armAsm->Str(armQRegister(qs), armVU0Mem(&VU0.VF[_Rd_]));
+		return;
+	}
+
+	if (_Rt_ == 0)
+	{
+		armAsm->Movi(RQSCRATCH.V2D(), 0);
 	}
 	else
 	{
+		// Covers the clean-const case too: a non-dirty const is by definition
+		// already flushed, so canonical memory is current for the lower 64
+		// (and the upper 64 only ever live in memory).
 		armAsm->Ldr(RQSCRATCH, armCpuRegMem(&cpuRegs.GPR.r[_Rt_]));
-		armMergeEEResidentIntoQuad(RQSCRATCH, _Rt_); // lazy-dirty / residency merge
+		armMergeEEResidentIntoQuad(RQSCRATCH, _Rt_); // lazy-dirty pin merge
 	}
 	armAsm->Str(RQSCRATCH, armVU0Mem(&VU0.VF[_Rd_]));
 }
 
 // CFC2: cpuRegs.GPR[rt] = sign_extend_32_to_64(VU0.VI[fs])
+//
+// S4-1: no block-wide flush (see recCOP2_QMFC2). The general path was
+// already allocator-coherent via the dest helpers; only the REG_R partial
+// write needs an explicit per-register flush.
 void recCOP2_CFC2()
 {
-	iFlushCall(FLUSH_EVERYTHING);
 	cop2EmitConditionalSync(cpuRegs.code & 1, _vu0FinishMicro);
 
 	if (_Rt_ == 0) return;
-	GPR_DEL_CONST(_Rt_);
 
 	if (_Rd_ == REG_R)
 	{
 		// REG_R: mask to 23 bits, write only UL[0]. This is a PARTIAL lower-64
-		// write (UL[1] untouched), which the full-width dest helper can't model;
-		// it stays a raw pin-aware store, coherence-safe because the entry
-		// iFlushCall(FLUSH_EVERYTHING) freed every rt residency (incl. x28).
+		// write (UL[1] untouched), which the full-width dest helper can't
+		// model; flush rt's residency with writeback (the untouched UL[1] /
+		// UD[1] bytes must be current in memory) so the raw pin-aware store
+		// merges into current bytes. NOTE: preserving UL[1] is the interp
+		// contract our tests pin — x86 recCFC2 zero-extends the full 64 bits
+		// here instead, a known upstream divergence we deliberately don't copy.
+		_deleteEEreg(_Rt_, 1);
 		armAsm->Ldr(RWSCRATCH, armVU0Mem(&VU0.VI[REG_R]));
 		armAsm->And(RWSCRATCH, RWSCRATCH, 0x7FFFFF);
 		armStoreEERegPtr(RWSCRATCH, &cpuRegs.GPR.r[_Rt_].UL[0]);
 	}
 	else
 	{
-		// General VI: rt = sign_extend_32_to_64(VI[fs]).
+		// General VI: rt = sign_extend_32_to_64(VI[fs]). _eeGetGPRDestReg
+		// kills const/NEON residency (NEON with writeback, so UD[1] stays
+		// current) and resolves pin/resident-slot/memory.
 		armAsm->Ldr(RWSCRATCH, armVU0Mem(&VU0.VI[_Rd_]));
 		const a64::Register dst = _eeGetGPRDestReg(_Rt_, RXSCRATCH);
 		armAsm->Sxtw(dst, RWSCRATCH);
@@ -1210,8 +1374,10 @@ void recCOP2_CTC2()
 		return;
 	}
 
-	// For all other cases: flush + conditional sync, then inline write
-	iFlushCall(FLUSH_EVERYTHING);
+	// For all other cases: conditional sync, then inline write. S4-1: no
+	// block-wide flush — the body reads rt coherently via _eeMoveGPRtoR
+	// (const/scalar/quad/pin aware) and writes only VU0 state; its raw w1/w2/
+	// w3/w9 scratch is outside the EE allocator pool by the GE-M2 carve-out.
 	cop2EmitConditionalSync(cpuRegs.code & 1, _vu0WaitMicro);
 
 	// Load source value from cpuRegs.GPR[rt].UL[0]
@@ -1461,11 +1627,33 @@ void recCOP2_VSUB()
 	if (_Fd_cop2 == 0 && _XYZW_cop2 == 0) return;
 	setupMacroOp_arm64(0x110);
 
-	const a64::VRegister fs = cop2GetVF(_Fs_cop2);
-	const a64::VRegister ft = cop2GetVF(_Ft_cop2);
-	const a64::VRegister rd = cop2ResultReg(_Fd_cop2, _XYZW_cop2);
-	armAsm->Fsub(rd.V4S(), fs.V4S(), ft.V4S());
-	cop2ClampResultReg(rd);
+	// NB: claim the operand slots (cop2GetVF) BEFORE the result slot
+	// (cop2ResultReg). A full-mask cop2ResultReg claims _Fd's VF-cache slot
+	// with fill=false — resident but unloaded; if it runs first and _Fd
+	// aliases _Fs/_Ft, the subsequent cop2GetVF finds that empty slot and
+	// hands back garbage instead of the operand (OutRun 2006 cars-through-
+	// floor, 2026-07-20). VADD/VMUL already load operands first; keep VSUB
+	// in the same order, per-branch.
+	a64::VRegister rd;
+	if (_Fs_cop2 == _Ft_cop2)
+	{
+		// PS2 x - x is exactly +0 in every lane: VU floats have no inf/NaN,
+		// so exp-FF bit patterns are valid huge numbers that cancel. A host
+		// Fsub would give NaN - NaN = NaN and the result clamp would turn
+		// that into +FLT_MAX (True Crime NYC black-world, 2026-07-20).
+		// Mirrors microVU_Upper's (_Ft_ == _Fs_) opCase1 short-circuit —
+		// non-broadcast only, matching x86 ("Don't do this with BC's!").
+		rd = cop2ResultReg(_Fd_cop2, _XYZW_cop2);
+		armAsm->Movi(rd.V4S(), 0);
+	}
+	else
+	{
+		const a64::VRegister fs = cop2GetVF(_Fs_cop2);
+		const a64::VRegister ft = cop2GetVF(_Ft_cop2);
+		rd = cop2ResultReg(_Fd_cop2, _XYZW_cop2);
+		armAsm->Fsub(rd.V4S(), fs.V4S(), ft.V4S());
+		cop2ClampResultReg(rd);
+	}
 	cop2EmitFlagUpdate(_XYZW_cop2, rd);
 	cop2ApplyDestMaskExplicit(_Fd_cop2, _XYZW_cop2, rd);
 
@@ -1538,10 +1726,10 @@ static void cop2LoadBroadcast(const a64::VRegister& qreg, int vfReg, int bc)
 		a64::VRegister mulA = fs; \
 		if (mulClamp) \
 		{ \
-			cop2ClampInto(RQSCRATCH, fs, RQSCRATCH3); \
+			cop2ClampInto(RQSCRATCH, fs); \
 			mulA = RQSCRATCH; \
 			if (_XYZW_cop2 == 0xf) \
-				cop2ClampRegOneTmp(RQSCRATCH2, RQSCRATCH3); \
+				cop2ClampResultReg(RQSCRATCH2); /* in-place operand clamp */ \
 		} \
 		const a64::VRegister rd = cop2ResultReg(_Fd_cop2, _XYZW_cop2); \
 		armAsm->neonOp(rd.V4S(), mulA.V4S(), RQSCRATCH2.V4S()); \
@@ -1719,8 +1907,7 @@ void recCOP2_VMSUB()
 // a zero broadcast Ft must become FLT_MAX*0 = 0 rather than Inf*0 = NaN folded
 // to +/-FLT_MAX by the result clamp. MSUBx/y/z/w use mVU_FMACd (clampType=0,
 // no cFs) — that Fs divergence is shared/by-design, so MSUB keeps clampFs=false.
-// The MADDw extras (cACC|cFt) are a separate concern. RQSCRATCH2/RQSCRATCH3 are
-// free as the ±FLT_MAX bounds here (Ft/ACC are loaded after the clamp).
+// The MADDw extras (cACC|cFt) are a separate concern.
 #define COP2_MADD_BC(name, addOp, bc, clampFs) \
 	void recCOP2_V##name() \
 	{ \
@@ -1730,7 +1917,7 @@ void recCOP2_VMSUB()
 		a64::VRegister mulA = fs; \
 		if (clampFs) \
 		{ \
-			cop2ClampInto(RQSCRATCH, fs, RQSCRATCH3); \
+			cop2ClampInto(RQSCRATCH, fs); \
 			mulA = RQSCRATCH; \
 		} \
 		cop2LoadBroadcast(RQSCRATCH2, _Ft_cop2, bc); \
@@ -1866,10 +2053,10 @@ COP2_ACCUM_OP(MULA, Fmul)
 		a64::VRegister mulA = fs; \
 		if (mulClamp) \
 		{ \
-			cop2ClampInto(RQSCRATCH, fs, RQSCRATCH3); \
+			cop2ClampInto(RQSCRATCH, fs); \
 			mulA = RQSCRATCH; \
 			if (_XYZW_cop2 == 0xf) \
-				cop2ClampRegOneTmp(RQSCRATCH2, RQSCRATCH3); \
+				cop2ClampResultReg(RQSCRATCH2); /* in-place operand clamp */ \
 		} \
 		const a64::VRegister rdA = cop2ResultRegACC(_XYZW_cop2); \
 		armAsm->neonOp(rdA.V4S(), mulA.V4S(), RQSCRATCH2.V4S()); \

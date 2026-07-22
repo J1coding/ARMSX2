@@ -8,8 +8,13 @@
 // a compliant IEEE FPU would have carried in its guard positions must read as
 // zero on PS2 hardware. The recompiler reproduces this by masking the low
 // mantissa bits of the smaller-exponent operand by the exponent difference
-// before the op - x86 FPU_ADD_SUB (iFPU.cpp:402, applied unconditionally in the
-// fast path) and the arm64 fpuEmitGuardedAddSub (iFPU-arm64.cpp).
+// before the op - x86 FPU_ADD_SUB (iFPU.cpp:402) and the arm64
+// fpuEmitGuardedAddSub (iFPU-arm64.cpp). Both JITs gate it on the same
+// CHECK_FPU_GUARDED / fpuGuardedAddSub option, which is ON by default (games
+// like True Crime NYC and Jak 3 misrender without it, and per-game flagging
+// proved impractical) but can be turned off globally for EE-heavy titles that
+// don't need it. These tests run under the default (ON); DisableEmitsPlainOp
+// at the bottom pins the opt-out path.
 //
 // THESE ARE JIT-ONLY TESTS. The shared interpreter's ADD_S/SUB_S (FPU.cpp) is a
 // plain host float + float (fpuDouble() returns float and does no masking),
@@ -43,7 +48,6 @@ TEST(EeRecFpuGuardBit, SubMasksOneGuardBit)
 {
 	EeRecTestHarness h;
 	h.EnableCop1();
-	h.EnableFpuGuarded();
 	h.SetFprBits(1, 0x40800000u); // 4.0
 	h.SetFprBits(2, 0x3f800003u); // 1.0 + 3ulp (dirty low bits)
 	h.LoadProgram({ee::SUB_S(3, 1, 2)});
@@ -57,7 +61,6 @@ TEST(EeRecFpuGuardBit, SubMasksTwoGuardBits)
 {
 	EeRecTestHarness h;
 	h.EnableCop1();
-	h.EnableFpuGuarded();
 	h.SetFprBits(1, 0x41000000u); // 8.0
 	h.SetFprBits(2, 0x3f80000fu); // 1.0 + 15ulp
 	h.LoadProgram({ee::SUB_S(3, 1, 2)});
@@ -71,7 +74,6 @@ TEST(EeRecFpuGuardBit, SubMasksFourGuardBits)
 {
 	EeRecTestHarness h;
 	h.EnableCop1();
-	h.EnableFpuGuarded();
 	h.SetFprBits(1, 0x42000000u); // 32.0
 	h.SetFprBits(2, 0x3f80003fu); // 1.0 + 63ulp
 	h.LoadProgram({ee::SUB_S(3, 1, 2)});
@@ -86,7 +88,6 @@ TEST(EeRecFpuGuardBit, AddMixedSignMasksGuardBit)
 {
 	EeRecTestHarness h;
 	h.EnableCop1();
-	h.EnableFpuGuarded();
 	h.SetFprBits(1, 0x40800000u); // +4.0
 	h.SetFprBits(2, 0xbf800003u); // -(1.0 + 3ulp)
 	h.LoadProgram({ee::ADD_S(3, 1, 2)});
@@ -102,7 +103,6 @@ TEST(EeRecFpuGuardBit, MsubMasksGuardBitOnAccumulate)
 {
 	EeRecTestHarness h;
 	h.EnableCop1();
-	h.EnableFpuGuarded();
 	h.SetAccBits(0x40800000u);    // ACC = 4.0
 	h.SetFprBits(1, 0x3f800003u); // fs = 1.0 + 3ulp
 	h.SetFprBits(2, 0x3f800000u); // ft = 1.0  -> product = 1.0 + 3ulp (exact)
@@ -119,7 +119,6 @@ TEST(EeRecFpuGuardBit, ExpDiffOneIsUnmaskedAndMatchesInterp)
 {
 	EeRecTestHarness h;
 	h.EnableCop1();
-	h.EnableFpuGuarded();
 	h.SetFprBits(1, 0x40000000u); // 2.0
 	h.SetFprBits(2, 0x3f800003u); // 1.0 + 3ulp
 	h.LoadProgram({ee::SUB_S(3, 1, 2)});
@@ -188,7 +187,6 @@ TEST(EeRecFpuGuardBit, RandomizedMatchesX86Model)
 		{
 			EeRecTestHarness h;
 			h.EnableCop1();
-			h.EnableFpuGuarded();
 			h.SetFprBits(1, a);
 			h.SetFprBits(2, b);
 			h.LoadProgram({ee::ADD_S(3, 1, 2)});
@@ -199,7 +197,6 @@ TEST(EeRecFpuGuardBit, RandomizedMatchesX86Model)
 		{
 			EeRecTestHarness h;
 			h.EnableCop1();
-			h.EnableFpuGuarded();
 			h.SetFprBits(1, a);
 			h.SetFprBits(2, b);
 			h.LoadProgram({ee::SUB_S(3, 1, 2)});
@@ -212,20 +209,23 @@ TEST(EeRecFpuGuardBit, RandomizedMatchesX86Model)
 	EXPECT_GT(checked, 1500) << "too many pairs skipped; the test is not exercising the mask";
 }
 
-// Default (guard OFF): guard-bit emulation is opt-in via fpuGuardedAddSub, off
-// by default. A guard-sensitive subtraction must now emit a plain fsub — no
-// masking — which makes the JIT bit-identical to the single-precision
-// interpreter (interp never masked). This pins the off-by-default behavior AND
-// that the fast path matches interp, so Run()'s JIT-vs-interp auto-diff holds.
-// Same operands as SubMasksOneGuardBit, which (with the option ON) asserts the
-// masked 0x403fffff; here the bare/interp value 0x403ffffe is the result.
-TEST(EeRecFpuGuardBit, DefaultOffEmitsPlainOpMatchingInterp)
+// Opt-out path (guard OFF): the default-ON fpuGuardedAddSub option can be turned
+// off globally for EE-heavy titles that don't need guard-bit accuracy. With it
+// off, a guard-sensitive subtraction must emit a plain fsub — no masking — which
+// makes the JIT bit-identical to the single-precision interpreter (interp never
+// masked). This pins that the toggle actually gates AND that the fast path
+// matches interp, so Run()'s JIT-vs-interp auto-diff holds. Same operands as
+// SubMasksOneGuardBit, which (guard ON) asserts the masked 0x403fffff; here the
+// bare/interp value 0x403ffffe is the result.
+TEST(EeRecFpuGuardBit, DisableEmitsPlainOpMatchingInterp)
 {
 	EeRecTestHarness h;
-	h.EnableCop1(); // note: no EnableFpuGuarded() — exercising the default
+	h.EnableCop1();
+	h.DisableFpuGuarded();
 	h.SetFprBits(1, 0x40800000u); // 4.0
 	h.SetFprBits(2, 0x3f800003u); // 1.0 + 3ulp
 	h.LoadProgram({ee::SUB_S(3, 1, 2)});
 	h.Run();
 	h.ExpectFpr(3, 0x403ffffeu); // bare == interp; masked (guard on) would be 0x403fffff
 }
+

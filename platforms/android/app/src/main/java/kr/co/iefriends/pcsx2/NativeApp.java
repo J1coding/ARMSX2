@@ -154,6 +154,10 @@ public class NativeApp {
 	 */
 	public static native void commitSettings();
 
+	/** Diagnostic: write a line to the native emulog (Console) so it shows in the in-app
+	 *  Save Log export. Used by the Joy-Con input diagnostic; no-ops if the console isn't open. */
+	public static native void emulog(String msg);
+
 	/**
 	 * Live GS-only reconfigure for a running VM. Reloads the whole EmuCore/GS
 	 * section from the base settings layer and pushes it to the GS thread via
@@ -288,6 +292,11 @@ public class NativeApp {
 	 *  PCSX2's desktop UI). Stream: gameIniBeginWrite() once, gameIniPut() per
 	 *  override key, gameIniCommitWrite() to save (or delete when empty). */
 	public static native boolean gameIniBeginWrite();
+	/** VM-less variant of {@link #gameIniBeginWrite()}: targets a game's INI by serial (globbing
+	 *  gamesettings/&lt;serial&gt;_*.ini) when nothing is running, so a per-game Reset from the
+	 *  library can still clear a stale, in-game-written override file. Returns false when no such
+	 *  file exists — there is then nothing to rewrite and the caller should skip the put/commit. */
+	public static native boolean gameIniBeginWriteForSerial(String serial);
 	public static native void gameIniPut(String section, String key, String value);
 	public static native boolean gameIniCommitWrite();
 
@@ -375,6 +384,11 @@ public class NativeApp {
 	private static final java.util.Set<android.media.MediaPlayer> sActiveSounds =
 			java.util.Collections.synchronizedSet(new java.util.HashSet<>());
 
+	/** Volume (0..1) for RA unlock / info / leaderboard-submit sounds. Set from Kotlin
+	 *  (AchievementsViewModel.setSoundVolume) so a slider tames the effect without editing the
+	 *  .wav. 1.0 = the sound as authored. */
+	public static volatile float sSoundVolume = 1.0f;
+
 	public static void playSound(String path) {
 		if (path == null || path.isEmpty()) return;
 		// Cap concurrent players — a burst of simultaneous unlocks (combo/milestone) could
@@ -385,7 +399,11 @@ public class NativeApp {
 			try {
 				mp = new android.media.MediaPlayer();
 				mp.setAudioAttributes(new android.media.AudioAttributes.Builder()
-						.setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+						// USAGE_GAME, not ASSISTANCE_SONIFICATION: the unlock jingle is game audio and
+						// must play on the media/game path. SONIFICATION is a UI/system-feedback usage
+						// that Do Not Disturb silences — which is why cheevo sounds went quiet with DND
+						// on. Game/media audio is exempt from DND, so this plays regardless.
+						.setUsage(android.media.AudioAttributes.USAGE_GAME)
 						.setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
 						.build());
 				mp.setDataSource(path);
@@ -393,6 +411,7 @@ public class NativeApp {
 				mp.setOnErrorListener((m, what, extra) -> { sActiveSounds.remove(m); try { m.release(); } catch (Throwable ignore) {} return true; });
 				sActiveSounds.add(mp);
 				mp.prepare();
+				mp.setVolume(sSoundVolume, sSoundVolume);
 				mp.start();
 			} catch (Throwable t) {
 				if (mp != null) { sActiveSounds.remove(mp); try { mp.release(); } catch (Throwable ignore) {} }
@@ -445,9 +464,16 @@ public class NativeApp {
 		}
 	}
 
+	/** User-set haptic strength multiplier (0..2, default 1.0 = as authored). Scales EVERY
+	 *  vibration — controller rumble AND touch ticks both funnel through rumbleOne — so one
+	 *  "Vibration Strength" slider tames or boosts all of it. Set from Kotlin
+	 *  (ControllerMappings.setHapticIntensity) live and at app start. */
+	public static volatile float sHapticScale = 1.0f;
+
 	/** @return true if [v] is a real, usable vibrator that was driven (or cancelled). */
 	private static boolean rumbleOne(Vibrator v, float intensity, int ms) {
 		if (v == null || !v.hasVibrator()) return false;
+		intensity *= sHapticScale;
 		if (intensity <= 0f) {
 			try { v.cancel(); } catch (Throwable ignored) {}
 			return true;
@@ -557,6 +583,9 @@ public class NativeApp {
 	public static native void setAspectRatio(int type);
 	public static native void setFmvAspectRatio(int type);
 	public static native void speedhackLimitermode(int value);
+	/** Fast-forward speed multiplier (Turbo scalar, 0.05-10.0). Set before engaging
+	 *  Turbo (speedhackLimitermode(1)); the FF-speed slider uses Unlimited (mode 3) at its top. */
+	public static native void setTurboScalar(float scalar);
 	/** Custom speed / FPS cap as a percent of native (100 = full speed).
 	 *  Applies live to the running VM's frame pacer. */
 	public static native void setNominalSpeed(int percent);
@@ -571,6 +600,9 @@ public class NativeApp {
 	/** Frame skip: present 1 frame, skip the next N (0 = off). Display-only
 	 *  throttle; applies live. */
 	public static native void setFrameSkip(int skip);
+
+	/** GitHub #375: top-align the render in portrait (true) vs vertical-center (false). */
+	public static native void setPortraitRenderTop(boolean top);
 	/** SPU2 output volume, percent (0..200). Applies live + persists. */
 	public static native void setAudioVolume(int volume);
 	/** Mute/unmute SPU2 output. Applies live + persists. */
@@ -609,6 +641,10 @@ public class NativeApp {
 	public static native boolean runVMThread(String path);
 	public static native void pause();
 	public static native void resume();
+	// Keep the audio device alive across a menu/overlay pause (no reclaim, no
+	// resume rebuild). Set true right before pauseForOverlay's pause(); resume()
+	// clears it. See native setOutputPauseSuppressed / SPU2::SetOutputPauseSuppressed.
+	public static native void setOutputPauseSuppressed(boolean suppressed);
 	public static native void shutdown();
 	public static native boolean hasActiveVM();
 
@@ -761,6 +797,26 @@ public class NativeApp {
 			if (dir.isDirectory()) return true;
 			dir.mkdirs();
 			return dir.isDirectory();
+		} catch (Throwable t) {
+			return false;
+		}
+	}
+
+	// Fallback file creation for native FileSystem::OpenCFile. On Android 11+
+	// FUSE-emulated external storage a raw libc fopen(O_CREAT) can be denied
+	// (EACCES/EPERM) even though the Java File API succeeds — the same split that
+	// forced createDirectoryPath above. Creating the empty file here lets the
+	// native truncating write ("w"/"wb") that follows open the now-existing file,
+	// which FUSE permits — which is what makes NEW folder-card saves work on a
+	// custom data folder instead of crashing. Returns true if the file exists after.
+	public static boolean createFilePath(String path) {
+		if (path == null || path.isEmpty()) return false;
+		try {
+			java.io.File file = new java.io.File(path);
+			if (file.isFile()) return true;
+			java.io.File parent = file.getParentFile();
+			if (parent != null && !parent.isDirectory()) parent.mkdirs();
+			return file.createNewFile() || file.isFile();
 		} catch (Throwable t) {
 			return false;
 		}

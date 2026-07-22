@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.armsx2.CustomCovers
 import com.armsx2.CustomNames
 import com.armsx2.GameInfo
+import com.armsx2.PlayTime
 import com.armsx2.config.ConfigStore
 import com.armsx2.i18n.str
 import com.armsx2.ui.common.EmptyState
@@ -116,7 +117,23 @@ fun InfoTab(game: GameInfo?) {
             InfoRow(str("info.region"), regionName(game.serial), clipboard)
             InfoRow(str("info.container"), game.extension.takeIf { it.isNotBlank() } ?: "—", clipboard)
             InfoRow(str("info.platform"), game.platform.name, clipboard)
-            InfoRow(str("info.compatibility"), if (game.compatibility > 0) "${game.compatibility} / 5" else "—", clipboard)
+            // Play time replaces the compatibility rating here. Compatibility is blank for most
+            // of the library (it only has a value where the GameDB carries one) so the row was
+            // usually a dash, whereas play time is populated for anything actually played.
+            //
+            // The per-serial totals have been recorded all along - PlayTime.startSession /
+            // endSession bracket the running VM - and only the display was lost in the interface
+            // rebuild, so existing users already have hours waiting here.
+            InfoRow(
+                str("info.playTime"),
+                PlayTime.formatPlayed(PlayTime.playedSeconds(serial)).ifEmpty { "—" },
+                clipboard,
+            )
+            InfoRow(
+                str("info.lastPlayed"),
+                PlayTime.formatLastPlayed(PlayTime.lastPlayedMillis(serial)).ifEmpty { "—" },
+                clipboard,
+            )
             InfoRow(str("info.path"), game.uri.toString(), clipboard)
             if (serial != null) {
                 Spacer(Modifier.height(14.dp))

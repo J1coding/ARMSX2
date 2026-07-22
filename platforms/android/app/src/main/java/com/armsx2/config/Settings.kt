@@ -146,6 +146,17 @@ data class Settings(
      *  CPU-bound devices; default off uses the scalar reference (unchanged
      *  audio). Applied on the next game boot/reset. */
     val spu2NeonReverb: Boolean = false,
+    /** SPU2/Output/AndroidOpenSLES — opt-in legacy OpenSL ES audio path (Oboe)
+     *  instead of AAudio. Slightly higher latency, but Android doesn't reclaim
+     *  the idle stream, so pause/resume (and fast-forward toggling through the
+     *  menu) never triggers the ~1s stream rebuild. Applies live (stream
+     *  reconfigures). Default off = AAudio low-latency. */
+    val audioOpenSLES: Boolean = false,
+    /** SPU2/Output/LightweightMode — low-end audio lever: skip the SPU2 reverb
+     *  pipeline (all echo/spatial reverb) in the mixer. Frees CPU on devices that
+     *  can't keep up even with NEON reverb; default off = full reverb. Applies
+     *  live (read per-sample in MixCore). */
+    val spu2LightweightMix: Boolean = false,
 
     // ---- EmuCore — patches / cheats ----
     /** EmuCore/EnablePatches — game-compatibility patches (default on). */
@@ -295,6 +306,12 @@ data class Settings(
     val cropTop: Int = 0,
     val cropRight: Int = 0,
     val cropBottom: Int = 0,
+    /** Display zoom, 100-150% (#383). An AetherSX2-style single "zoom" slider: rather than the
+     *  four fiddly per-edge crops (which distort when set unevenly), this trims all four edges by
+     *  the SAME fraction, so the image scales up into the frame without changing aspect. App-side
+     *  only (no native key) — it's converted to symmetric CropLeft/Top/Right/Bottom in writeIni,
+     *  overriding the manual crops while > 100. */
+    val displayZoom: Int = 100,
     /** EmuCore/GS/dithering_ps2 — 0 Off / 1 Scaled / 2 Unscaled / 3 Force 32bit. PCSX2 default Unscaled. */
     val dithering: Int = 2,
     /** EmuCore/GS/VsyncQueueSize — frames the GS thread may queue (0-3). PCSX2 default 2. */
@@ -333,6 +350,10 @@ data class Settings(
      *  per-game at game boot (global in the library/menus). Seeded from the legacy global
      *  "ui.orientation" pref on first load. */
     val orientation: Int = 0,
+    /** GitHub #375: in PORTRAIT, top-align the render (true, default) instead of vertical-
+     *  centering (false), so the bottom is free for touch controls. Applied live via
+     *  NativeApp.setPortraitRenderTop; only affects a portrait window. */
+    val portraitRenderTop: Boolean = true,
     /** EmuCore/GS FramerateNTSC — the emulated PS2 vsync rate for NTSC games
      *  (PCSX2 default 59.94). Lowering it slows the game's target rate; raising it
      *  speeds it up. Mirrors NetherSX2's "Framerate For NTSC". */
@@ -670,7 +691,7 @@ data class Settings(
         if (emitSink == null) {
             NativeApp.speedhackLimitermode(
                 when {
-                    MainActivityRuntime.fastForwardToggleActive -> MainActivityRuntime.FF_LIMITER_MODE
+                    MainActivityRuntime.fastForwardToggleActive -> MainActivityRuntime.ffLimiterMode()
                     MainActivityRuntime.slowDownToggleActive -> 2
                     else -> if (frameLimitEnable) 0 else 3
                 }
@@ -692,6 +713,7 @@ data class Settings(
         // Manual frameskip (0..5) — present 1 of every (N+1) frames. Held as a
         // GS-thread global, applied live; no persisted EmuCore key needed.
         if (emitSink == null) NativeApp.setFrameSkip(frameSkip.coerceIn(0, 5))
+        if (emitSink == null) NativeApp.setPortraitRenderTop(portraitRenderTop)
         // Audio (SPU2). Volume/mute are live native setters; the rest are written
         // to the base layer and applied on commit (SPU2 stream reconfigure).
         if (emitSink == null) NativeApp.setAudioVolume(audioVolume.coerceIn(0, 200))
@@ -704,6 +726,11 @@ data class Settings(
         // Opt-in NEON reverb FIR (ARM64). Read by SPU2::InternalReset on the
         // next game boot; default off = scalar reference (unchanged audio).
         put("SPU2", "NeonReverbSIMD", "bool", spu2NeonReverb.toString())
+        // Opt-in OpenSL ES output (Oboe). Lives in the SPU2/Output StreamParameters,
+        // so ApplySettings → CheckForConfigChanges recreates the stream on toggle.
+        put("SPU2/Output", "AndroidOpenSLES", "bool", audioOpenSLES.toString())
+        // Lightweight mix (skip reverb) — read live in MixCore via EmuConfig.SPU2.
+        put("SPU2/Output", "LightweightMode", "bool", spu2LightweightMix.toString())
         // Patches / cheats (EmuCore). Reloaded by ApplySettings →
         // CheckForPatchConfigChanges; widescreen/no-interlacing take effect on
         // the next boot for most games.
@@ -911,6 +938,8 @@ data class Settings(
             audioOutputLatencyMs = intAt("SPU2/Output/OutputLatencyMS") ?: this.audioOutputLatencyMs,
             audioFastForwardVolume = intAt("SPU2/Output/FastForwardVolume") ?: this.audioFastForwardVolume,
             spu2NeonReverb = boolAt("SPU2/NeonReverbSIMD") ?: this.spu2NeonReverb,
+            audioOpenSLES = boolAt("SPU2/Output/AndroidOpenSLES") ?: this.audioOpenSLES,
+            spu2LightweightMix = boolAt("SPU2/Output/LightweightMode") ?: this.spu2LightweightMix,
             // ---- EmuCore patches / cheats ----
             enablePatches = boolAt("EmuCore/EnablePatches") ?: this.enablePatches,
             enableCheats = boolAt("EmuCore/EnableCheats") ?: this.enableCheats,
@@ -1143,7 +1172,7 @@ data class Settings(
      *  running game already reflects the change live, so the native commit does
      *  not reload — the INI applies as the game layer on the next boot. No-op
      *  when no VM is running. */
-    fun writeGameSettingsIni(global: Settings) {
+    fun writeGameSettingsIni(global: Settings, serial: String? = null) {
         // Baseline: global's persisted keys. applyTo early-returns before the
         // live pokes/commit while emitSink is set, so nothing touches the VM.
         val baseline = HashMap<String, String>()
@@ -1153,7 +1182,12 @@ data class Settings(
         } finally {
             emitSink = null
         }
-        if (!NativeApp.gameIniBeginWrite()) return
+        // With a running VM the target is the current game (gameIniBeginWrite). With no VM — a
+        // per-game Reset done from the library — pass [serial] to locate the file directly; false
+        // there means no stale override file exists, so there is nothing to rewrite.
+        val began = if (serial == null) NativeApp.gameIniBeginWrite()
+                    else NativeApp.gameIniBeginWriteForSerial(serial)
+        if (!began) return
         // Effective pass: stream only the keys that differ from the baseline.
         emitSink = { section, key, _, value ->
             if (baseline["$section$key"] != value)
@@ -1270,10 +1304,21 @@ data class Settings(
         put("EmuCore/GS", "HWSpinGPUForReadbacks", "bool", spinGpuReadbacks.toString())
         put("EmuCore/GS", "HWSpinCPUForReadbacks", "bool", spinCpuReadbacks.toString())
         put("EmuCore/GS", "IntegerScaling", "bool", integerScaling.toString())
-        put("EmuCore/GS", "CropLeft", "int", cropLeft.coerceIn(0, 640).toString())
-        put("EmuCore/GS", "CropTop", "int", cropTop.coerceIn(0, 640).toString())
-        put("EmuCore/GS", "CropRight", "int", cropRight.coerceIn(0, 640).toString())
-        put("EmuCore/GS", "CropBottom", "int", cropBottom.coerceIn(0, 640).toString())
+        // Display zoom (#383) overrides the manual crops while active: trim every edge by the
+        // same fraction so the picture scales up without distortion. Nominal 640x448 native
+        // frame; the zoom factor is what matters visually, so an approximate frame size is fine.
+        // (1 - 100/Z)/2 is the per-edge fraction that leaves 1/Z of the image visible, centred.
+        val zoom = displayZoom.coerceIn(100, 150)
+        val zCropX = if (zoom > 100) ((640.0 * (1.0 - 100.0 / zoom)) / 2.0).toInt() else -1
+        val zCropY = if (zoom > 100) ((448.0 * (1.0 - 100.0 / zoom)) / 2.0).toInt() else -1
+        val effLeft = if (zCropX >= 0) zCropX else cropLeft
+        val effRight = if (zCropX >= 0) zCropX else cropRight
+        val effTop = if (zCropY >= 0) zCropY else cropTop
+        val effBottom = if (zCropY >= 0) zCropY else cropBottom
+        put("EmuCore/GS", "CropLeft", "int", effLeft.coerceIn(0, 640).toString())
+        put("EmuCore/GS", "CropTop", "int", effTop.coerceIn(0, 640).toString())
+        put("EmuCore/GS", "CropRight", "int", effRight.coerceIn(0, 640).toString())
+        put("EmuCore/GS", "CropBottom", "int", effBottom.coerceIn(0, 640).toString())
         put("EmuCore/GS", "dithering_ps2", "int", dithering.coerceIn(0, 3).toString())
         put("EmuCore/GS", "VsyncQueueSize", "int", vsyncQueueSize.coerceIn(0, 3).toString())
         put("EmuCore/GS", "autoflush_sw", "bool", autoFlushSw.toString())
@@ -1447,10 +1492,13 @@ data class Settings(
         put("audioOutputLatencyMs", audioOutputLatencyMs)
         put("audioFastForwardVolume", audioFastForwardVolume)
         put("spu2NeonReverb", spu2NeonReverb)
+        put("audioOpenSLES", audioOpenSLES)
+        put("spu2LightweightMix", spu2LightweightMix)
         put("renderer", renderer)
         put("upscaleFloat", upscaleFloat.toDouble())
         put("customDriverId", customDriverId)
         put("orientation", orientation)
+        put("portraitRenderTop", portraitRenderTop)
         put("framerateNtsc", framerateNtsc.toDouble())
         put("frameratePal", frameratePal.toDouble())
         put("enablePatches", enablePatches)
@@ -1504,6 +1552,7 @@ data class Settings(
         put("spinCpuReadbacks", spinCpuReadbacks)
         put("integerScaling", integerScaling)
         put("cropLeft", cropLeft)
+        put("displayZoom", displayZoom)
         put("cropTop", cropTop)
         put("cropRight", cropRight)
         put("cropBottom", cropBottom)
@@ -1692,10 +1741,13 @@ data class Settings(
                 audioOutputLatencyMs = json.optInt("audioOutputLatencyMs", def.audioOutputLatencyMs),
                 audioFastForwardVolume = json.optInt("audioFastForwardVolume", def.audioFastForwardVolume),
                 spu2NeonReverb = json.optBoolean("spu2NeonReverb", def.spu2NeonReverb),
+                audioOpenSLES = json.optBoolean("audioOpenSLES", def.audioOpenSLES),
+                spu2LightweightMix = json.optBoolean("spu2LightweightMix", def.spu2LightweightMix),
                 renderer = json.optString("renderer", def.renderer),
                 upscaleFloat = json.optDouble("upscaleFloat", def.upscaleFloat.toDouble()).toFloat(),
                 customDriverId = json.optString("customDriverId", def.customDriverId),
                 orientation = json.optInt("orientation", def.orientation),
+                portraitRenderTop = json.optBoolean("portraitRenderTop", def.portraitRenderTop),
                 framerateNtsc = json.optDouble("framerateNtsc", def.framerateNtsc.toDouble()).toFloat(),
                 frameratePal = json.optDouble("frameratePal", def.frameratePal.toDouble()).toFloat(),
                 enablePatches = json.optBoolean("enablePatches", def.enablePatches),
@@ -1753,6 +1805,7 @@ data class Settings(
                 spinCpuReadbacks = json.optBoolean("spinCpuReadbacks", def.spinCpuReadbacks),
                 integerScaling = json.optBoolean("integerScaling", def.integerScaling),
                 cropLeft = json.optInt("cropLeft", def.cropLeft),
+                displayZoom = json.optInt("displayZoom", def.displayZoom),
                 cropTop = json.optInt("cropTop", def.cropTop),
                 cropRight = json.optInt("cropRight", def.cropRight),
                 cropBottom = json.optInt("cropBottom", def.cropBottom),
@@ -1923,10 +1976,13 @@ data class Settings(
             if (current.audioOutputLatencyMs != base.audioOutputLatencyMs) j.put("audioOutputLatencyMs", current.audioOutputLatencyMs)
             if (current.audioFastForwardVolume != base.audioFastForwardVolume) j.put("audioFastForwardVolume", current.audioFastForwardVolume)
             if (current.spu2NeonReverb != base.spu2NeonReverb) j.put("spu2NeonReverb", current.spu2NeonReverb)
+            if (current.audioOpenSLES != base.audioOpenSLES) j.put("audioOpenSLES", current.audioOpenSLES)
+            if (current.spu2LightweightMix != base.spu2LightweightMix) j.put("spu2LightweightMix", current.spu2LightweightMix)
             if (current.renderer != base.renderer) j.put("renderer", current.renderer)
             if (current.upscaleFloat != base.upscaleFloat) j.put("upscaleFloat", current.upscaleFloat.toDouble())
             if (current.customDriverId != base.customDriverId) j.put("customDriverId", current.customDriverId)
             if (current.orientation != base.orientation) j.put("orientation", current.orientation)
+            if (current.portraitRenderTop != base.portraitRenderTop) j.put("portraitRenderTop", current.portraitRenderTop)
             if (current.framerateNtsc != base.framerateNtsc) j.put("framerateNtsc", current.framerateNtsc.toDouble())
             if (current.frameratePal != base.frameratePal) j.put("frameratePal", current.frameratePal.toDouble())
             if (current.enablePatches != base.enablePatches) j.put("enablePatches", current.enablePatches)
@@ -1980,6 +2036,7 @@ data class Settings(
             if (current.spinCpuReadbacks     != base.spinCpuReadbacks)     j.put("spinCpuReadbacks", current.spinCpuReadbacks)
             if (current.integerScaling       != base.integerScaling)       j.put("integerScaling", current.integerScaling)
             if (current.cropLeft             != base.cropLeft)             j.put("cropLeft", current.cropLeft)
+            if (current.displayZoom          != base.displayZoom)          j.put("displayZoom", current.displayZoom)
             if (current.cropTop              != base.cropTop)              j.put("cropTop", current.cropTop)
             if (current.cropRight            != base.cropRight)            j.put("cropRight", current.cropRight)
             if (current.cropBottom           != base.cropBottom)           j.put("cropBottom", current.cropBottom)
@@ -2135,10 +2192,13 @@ data class Settings(
             audioOutputLatencyMs = if (overrides.has("audioOutputLatencyMs")) overrides.getInt("audioOutputLatencyMs") else base.audioOutputLatencyMs,
             audioFastForwardVolume = if (overrides.has("audioFastForwardVolume")) overrides.getInt("audioFastForwardVolume") else base.audioFastForwardVolume,
             spu2NeonReverb = if (overrides.has("spu2NeonReverb")) overrides.getBoolean("spu2NeonReverb") else base.spu2NeonReverb,
+            audioOpenSLES = if (overrides.has("audioOpenSLES")) overrides.getBoolean("audioOpenSLES") else base.audioOpenSLES,
+            spu2LightweightMix = if (overrides.has("spu2LightweightMix")) overrides.getBoolean("spu2LightweightMix") else base.spu2LightweightMix,
             renderer = if (overrides.has("renderer")) overrides.getString("renderer") else base.renderer,
             upscaleFloat = if (overrides.has("upscaleFloat")) overrides.getDouble("upscaleFloat").toFloat() else base.upscaleFloat,
             customDriverId = if (overrides.has("customDriverId")) overrides.getString("customDriverId") else base.customDriverId,
             orientation = if (overrides.has("orientation")) overrides.getInt("orientation") else base.orientation,
+            portraitRenderTop = if (overrides.has("portraitRenderTop")) overrides.getBoolean("portraitRenderTop") else base.portraitRenderTop,
             framerateNtsc = if (overrides.has("framerateNtsc")) overrides.getDouble("framerateNtsc").toFloat() else base.framerateNtsc,
             frameratePal = if (overrides.has("frameratePal")) overrides.getDouble("frameratePal").toFloat() else base.frameratePal,
             enablePatches = if (overrides.has("enablePatches")) overrides.getBoolean("enablePatches") else base.enablePatches,
@@ -2197,6 +2257,7 @@ data class Settings(
             spinCpuReadbacks = if (overrides.has("spinCpuReadbacks")) overrides.getBoolean("spinCpuReadbacks") else base.spinCpuReadbacks,
             integerScaling = if (overrides.has("integerScaling")) overrides.getBoolean("integerScaling") else base.integerScaling,
             cropLeft = if (overrides.has("cropLeft")) overrides.getInt("cropLeft") else base.cropLeft,
+            displayZoom = if (overrides.has("displayZoom")) overrides.getInt("displayZoom") else base.displayZoom,
             cropTop = if (overrides.has("cropTop")) overrides.getInt("cropTop") else base.cropTop,
             cropRight = if (overrides.has("cropRight")) overrides.getInt("cropRight") else base.cropRight,
             cropBottom = if (overrides.has("cropBottom")) overrides.getInt("cropBottom") else base.cropBottom,

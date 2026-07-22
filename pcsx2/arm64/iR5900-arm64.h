@@ -707,6 +707,11 @@ u32 scaleblockcycles_clear();
 // flags say no sync is needed.
 void cop2EmitConditionalSync(bool interlock, void (*finishFunc)());
 
+// S4-2: emits the shared VU0-sync stubs cop2EmitConditionalSync BLs into
+// (defined in iCOP2-arm64.cpp). Must run during dispatcher generation,
+// before any block compiles — called from _DynGen_Dispatchers.
+void cop2DynGenSyncStubs();
+
 // (Re)writes _cpuRegistersPack.cop2Rec — the COP2 macro-mode clamp/mask
 // constants the emitters reach via [RSTATE, #imm] (defined in
 // iCOP2-arm64.cpp). Called from recResetRaw before any block compiles.
@@ -732,16 +737,35 @@ Cop2VfCacheState cop2VfCacheGetState();               // fork-tail peek support
 void cop2VfCacheSetState(const Cop2VfCacheState&);
 bool cop2OpPreservesVfCache(u32 code);                // classifier for recompileNextInstruction
 
-// RAII: preserve the compile-time cache state across a branch-fork tail
+// SL-13: compile-time validity of the q25/q26 clamp-constant broadcasts
+// (defined in iCOP2-arm64.cpp — see cop2EnsureClampConsts for the full
+// discipline). Invalidate at every real C-call seam (iFlushCall) and at
+// block start; the flag joins BranchCompileState for forks/side exits;
+// vtlbGetLiveRegisterMasks reads it to make fastmem thunks preserve q25/q26.
+bool cop2ClampConstsValid();
+void cop2ClampConstsSetValid(bool valid);
+void cop2ClampConstsInvalidate();
+
+// RAII: preserve the compile-time COP2 residency state (VF cache + SL-13
+// clamp-const validity) across a branch-fork tail
 // (SetBranchImm/SetBranchImmCall/SetBranchReg) whose iFlushCall destructively
 // flushes — the sibling fork must re-emit its own writebacks from the same
 // pre-tail state, since the cached values stay register-resident along every
-// runtime path.
+// runtime path (and q25/q26 stay materialized on the not-taken path).
 struct Cop2VfCacheScope
 {
 	Cop2VfCacheState state;
-	Cop2VfCacheScope() : state(cop2VfCacheGetState()) {}
-	~Cop2VfCacheScope() { cop2VfCacheSetState(state); }
+	bool clampConstsValid;
+	Cop2VfCacheScope()
+		: state(cop2VfCacheGetState())
+		, clampConstsValid(cop2ClampConstsValid())
+	{
+	}
+	~Cop2VfCacheScope()
+	{
+		cop2VfCacheSetState(state);
+		cop2ClampConstsSetValid(clampConstsValid);
+	}
 };
 
 // COP2 macro-mode microVU0 state setup/teardown (defined in microVU-arm64.cpp).
