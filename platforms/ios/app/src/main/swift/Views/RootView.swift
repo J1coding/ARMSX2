@@ -77,11 +77,26 @@ struct MenuTabView: View {
                 case 0:
                     GameListView()
                 case 1:
-                    BIOSListView()
+                    ZStack {
+                        if settings.hasCustomBackground && settings.backgroundEnabledInBIOS {
+                            MenuBackgroundLayer()
+                        }
+                        BIOSListView()
+                    }
                 case 2:
-                    HelpView()
+                    ZStack {
+                        if settings.hasCustomBackground && settings.backgroundEnabledInHelp {
+                            MenuBackgroundLayer()
+                        }
+                        HelpView()
+                    }
                 default:
-                    SettingsRootView()
+                    ZStack {
+                        if settings.hasCustomBackground && settings.backgroundEnabledInSettings {
+                            MenuBackgroundLayer()
+                        }
+                        SettingsRootView()
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -101,7 +116,7 @@ struct MenuTabView: View {
                 }
                 .tag(0)
 
-            SafeAreaProtectedMenuTabContent {
+            SafeAreaProtectedMenuTabContent(backgroundActive: settings.hasCustomBackground && settings.backgroundEnabledInBIOS) {
                 BIOSListView()
             }
                 .environment(\.menuTabIsActive, selectedTab == 1)
@@ -110,7 +125,7 @@ struct MenuTabView: View {
                 }
                 .tag(1)
 
-            SafeAreaProtectedMenuTabContent {
+            SafeAreaProtectedMenuTabContent(backgroundActive: settings.hasCustomBackground && settings.backgroundEnabledInHelp) {
                 HelpView()
             }
                 .environment(\.menuTabIsActive, selectedTab == 2)
@@ -119,7 +134,7 @@ struct MenuTabView: View {
                 }
                 .tag(2)
 
-            SafeAreaProtectedMenuTabContent {
+            SafeAreaProtectedMenuTabContent(backgroundActive: settings.hasCustomBackground && settings.backgroundEnabledInSettings) {
                 NavigationStack {
                     SettingsRootView()
                 }
@@ -153,10 +168,13 @@ private struct PreventTabBarCollapseModifier: ViewModifier {
 @MainActor
 private struct SafeAreaProtectedMenuTabContent<Content: View>: View {
     @Environment(\.layoutDirection) private var layoutDirection
+    @Environment(\.menuTabIsActive) private var menuTabIsActive
     @State private var safeAreaInsets = KeyWindowSafeArea.horizontalInsets()
+    let backgroundActive: Bool
     let content: Content
 
-    init(@ViewBuilder content: () -> Content) {
+    init(backgroundActive: Bool = false, @ViewBuilder content: () -> Content) {
+        self.backgroundActive = backgroundActive
         self.content = content()
     }
 
@@ -172,13 +190,18 @@ private struct SafeAreaProtectedMenuTabContent<Content: View>: View {
                 isLandscape: geometry.size.width > geometry.size.height,
                 idiom: UIDevice.current.userInterfaceIdiom
             )
-            content
-                .padding(.leading, layoutDirection == .rightToLeft ? insets.right : insets.left)
-                .padding(.trailing, layoutDirection == .rightToLeft ? insets.left : insets.right)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .onChange(of: geometry.size) { _, _ in
-                    safeAreaInsets = KeyWindowSafeArea.horizontalInsets()
+            ZStack {
+                if backgroundActive && menuTabIsActive {
+                    MenuBackgroundLayer()
                 }
+                content
+                    .padding(.leading, layoutDirection == .rightToLeft ? insets.right : insets.left)
+                    .padding(.trailing, layoutDirection == .rightToLeft ? insets.left : insets.right)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .onChange(of: geometry.size) { _, _ in
+                safeAreaInsets = KeyWindowSafeArea.horizontalInsets()
+            }
         }
         .onAppear {
             safeAreaInsets = KeyWindowSafeArea.horizontalInsets()

@@ -107,9 +107,14 @@ struct SettingsRootView: View {
     @State private var noJITFallbackActive = ARMSX2Bridge.isNoJITFallbackActive()
     @State private var stikDebugOpenFailed = false
     @State private var stikDebugOpenInProgress = false
+    @Environment(\.menuTabIsActive) private var menuTabIsActive
 #if targetEnvironment(macCatalyst)
     @State private var selectedPane: SettingsPane? = .emulator
 #endif
+
+    private var backgroundActive: Bool {
+        settings.hasCustomBackground && settings.backgroundEnabledInSettings && menuTabIsActive
+    }
 
     var body: some View {
 #if targetEnvironment(macCatalyst)
@@ -125,6 +130,7 @@ struct SettingsRootView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .navigationSplitViewStyle(.balanced)
+        .containerBackground(backgroundActive ? Color.clear : Color(uiColor: .systemGroupedBackground), for: .navigation)
 #else
         List {
             Section(settings.localized("Interface")) {
@@ -253,7 +259,9 @@ struct SettingsRootView: View {
                 }
             }
         }
+        .scrollContentBackground(backgroundActive ? .hidden : .automatic)
         .navigationTitle(settings.localized("Settings"))
+        .toolbarBackground(backgroundActive ? .hidden : .automatic, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top) {
             Color.clear.frame(height: 6)

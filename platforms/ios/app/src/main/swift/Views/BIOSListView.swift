@@ -14,6 +14,11 @@ struct BIOSListView: View {
     @State private var showBIOSReplacementAlert = false
     @State private var pendingBIOSImportURLs: [URL] = []
     @State private var existingBIOSImportFileNames: [String] = []
+    @Environment(\.menuTabIsActive) private var menuTabIsActive
+
+    private var backgroundActive: Bool {
+        settings.hasCustomBackground && settings.backgroundEnabledInBIOS && menuTabIsActive
+    }
 
     var body: some View {
         NavigationStack {
@@ -24,8 +29,10 @@ struct BIOSListView: View {
                     List {
                         ForEach(bioses, id: \.self) { bios in
                             biosRow(bios)
+                                .menuBackgroundListRow(backgroundActive)
                         }
                     }
+                    .scrollContentBackground(backgroundActive ? .hidden : .automatic)
 #if targetEnvironment(macCatalyst)
                     .listStyle(.inset)
 #endif
@@ -33,6 +40,7 @@ struct BIOSListView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle(settings.localized("BIOS"))
+            .toolbarBackground(backgroundActive ? .hidden : .automatic, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -263,22 +271,34 @@ struct BIOSListView: View {
         return "\(fileMessage)\nNo bootable PS2 BIOS was found. Import a valid PS2 BIOS dump before starting games."
     }
 
+    @ViewBuilder
     private func regionBadge(for bios: ARMSX2BIOSInfo) -> some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(.secondarySystemGroupedBackground))
+        if backgroundActive {
+            badgeContent(for: bios)
                 .frame(width: 44, height: 44)
-
-            if let flag = flagEmoji(for: bios.countryCode) {
-                Text(flag)
-                    .font(.title2)
-            } else {
-                Image(systemName: "globe")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-            }
+                .glassSurface(cornerRadius: 12)
+                .accessibilityLabel(bios.valid ? "\(bios.regionName) BIOS" : settings.localized("Not a boot BIOS"))
+        } else {
+            badgeContent(for: bios)
+                .frame(width: 44, height: 44)
+                .background(
+                    Color(.secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+                .accessibilityLabel(bios.valid ? "\(bios.regionName) BIOS" : settings.localized("Not a boot BIOS"))
         }
-        .accessibilityLabel(bios.valid ? "\(bios.regionName) BIOS" : settings.localized("Not a boot BIOS"))
+    }
+
+    @ViewBuilder
+    private func badgeContent(for bios: ARMSX2BIOSInfo) -> some View {
+        if let flag = flagEmoji(for: bios.countryCode) {
+            Text(flag)
+                .font(.title2)
+        } else {
+            Image(systemName: "globe")
+                .font(.title3)
+                .foregroundStyle(.secondary)
+        }
     }
 
     private func flagEmoji(for countryCode: String) -> String? {

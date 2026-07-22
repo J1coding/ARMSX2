@@ -102,9 +102,14 @@ private let helpData: [HelpSection] = [
 struct HelpView: View {
     @State private var settings = SettingsStore.shared
     @State private var copyStatusMessage: String?
+    @Environment(\.menuTabIsActive) private var menuTabIsActive
 #if targetEnvironment(macCatalyst)
     @State private var selectedTopic: HelpTopic? = .item(section: 0, item: 0)
 #endif
+
+    private var backgroundActive: Bool {
+        settings.hasCustomBackground && settings.backgroundEnabledInHelp && menuTabIsActive
+    }
 
     var body: some View {
 #if targetEnvironment(macCatalyst)
@@ -137,6 +142,7 @@ struct HelpView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .navigationSplitViewStyle(.balanced)
+        .containerBackground(backgroundActive ? Color.clear : Color(uiColor: .systemGroupedBackground), for: .navigation)
 #else
         NavigationStack {
             List {
@@ -154,6 +160,7 @@ struct HelpView: View {
                                     .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                                     .contentShape(Rectangle())
                             }
+                            .menuBackgroundListRow(backgroundActive)
                         }
                     } header: {
                         Label(settings.localized(section.title), systemImage: section.icon)
@@ -182,7 +189,9 @@ struct HelpView: View {
                     Label(settings.localized("About"), systemImage: "info.circle")
                 }
             }
+            .scrollContentBackground(backgroundActive ? .hidden : .automatic)
             .navigationTitle(settings.localized("Help"))
+            .toolbarBackground(backgroundActive ? .hidden : .automatic, for: .navigationBar)
         }
 #endif
     }
