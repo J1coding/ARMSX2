@@ -145,51 +145,56 @@ struct HelpView: View {
         .containerBackground(backgroundActive ? Color.clear : Color(uiColor: .systemGroupedBackground), for: .navigation)
 #else
         NavigationStack {
-            List {
-                ForEach(helpData) { section in
-                    Section {
-                        ForEach(section.items) { item in
-                            DisclosureGroup {
-                                Text(settings.localized(item.answer))
-                                    .font(.body)
-                                    .foregroundStyle(.secondary)
-                                    .padding(.vertical, 4)
-                            } label: {
-                                Text(settings.localized(item.question))
-                                    .font(.body)
-                                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                                    .contentShape(Rectangle())
+            ZStack {
+                if backgroundActive {
+                    MenuBackgroundLayer()
+                }
+                List {
+                    ForEach(helpData) { section in
+                        Section {
+                            ForEach(section.items) { item in
+                                DisclosureGroup {
+                                    Text(settings.localized(item.answer))
+                                        .font(.body)
+                                        .foregroundStyle(.secondary)
+                                        .padding(.vertical, 4)
+                                } label: {
+                                    Text(settings.localized(item.question))
+                                        .font(.body)
+                                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                        .contentShape(Rectangle())
+                                }
+                                .menuBackgroundListRow(backgroundActive)
                             }
-                            .menuBackgroundListRow(backgroundActive)
+                        } header: {
+                            Label(settings.localized(section.title), systemImage: section.icon)
+                        }
+                    }
+
+                    Section {
+                        HStack {
+                            Text(settings.localized("Version"))
+                            Spacer()
+                            Text(ARMSX2Bridge.buildVersion())
+                                .foregroundStyle(.secondary)
+                                .font(.caption)
+                        }
+                        Button {
+                            copyTroubleshootingInfo()
+                        } label: {
+                            Label(settings.localized("Copy Troubleshooting Info"), systemImage: "doc.on.doc")
+                        }
+                        if let copyStatusMessage {
+                            Text(settings.localized(copyStatusMessage))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     } header: {
-                        Label(settings.localized(section.title), systemImage: section.icon)
+                        Label(settings.localized("About"), systemImage: "info.circle")
                     }
                 }
-
-                Section {
-                    HStack {
-                        Text(settings.localized("Version"))
-                        Spacer()
-                        Text(ARMSX2Bridge.buildVersion())
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    }
-                    Button {
-                        copyTroubleshootingInfo()
-                    } label: {
-                        Label(settings.localized("Copy Troubleshooting Info"), systemImage: "doc.on.doc")
-                    }
-                    if let copyStatusMessage {
-                        Text(settings.localized(copyStatusMessage))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                } header: {
-                    Label(settings.localized("About"), systemImage: "info.circle")
-                }
+                .scrollContentBackground(backgroundActive ? .hidden : .automatic)
             }
-            .scrollContentBackground(backgroundActive ? .hidden : .automatic)
             .navigationTitle(settings.localized("Help"))
             .toolbarBackground(backgroundActive ? .hidden : .automatic, for: .navigationBar)
         }

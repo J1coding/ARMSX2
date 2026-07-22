@@ -22,23 +22,28 @@ struct BIOSListView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if bioses.isEmpty {
-                    emptyState
-                } else {
-                    List {
-                        ForEach(bioses, id: \.self) { bios in
-                            biosRow(bios)
-                                .menuBackgroundListRow(backgroundActive)
-                        }
-                    }
-                    .scrollContentBackground(backgroundActive ? .hidden : .automatic)
-#if targetEnvironment(macCatalyst)
-                    .listStyle(.inset)
-#endif
+            ZStack {
+                if backgroundActive {
+                    MenuBackgroundLayer()
                 }
+                Group {
+                    if bioses.isEmpty {
+                        emptyState
+                    } else {
+                        List {
+                            ForEach(bioses, id: \.self) { bios in
+                                biosRow(bios)
+                                    .menuBackgroundListRow(backgroundActive)
+                            }
+                        }
+                        .scrollContentBackground(backgroundActive ? .hidden : .automatic)
+#if targetEnvironment(macCatalyst)
+                        .listStyle(.inset)
+#endif
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle(settings.localized("BIOS"))
             .toolbarBackground(backgroundActive ? .hidden : .automatic, for: .navigationBar)
             .toolbar {

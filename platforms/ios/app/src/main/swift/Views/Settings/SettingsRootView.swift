@@ -132,7 +132,11 @@ struct SettingsRootView: View {
         .navigationSplitViewStyle(.balanced)
         .containerBackground(backgroundActive ? Color.clear : Color(uiColor: .systemGroupedBackground), for: .navigation)
 #else
-        List {
+        ZStack {
+            if backgroundActive {
+                MenuBackgroundLayer()
+            }
+            List {
             Section(settings.localized("Interface")) {
                 NavigationLink {
                     LanguageSettingsView()
@@ -260,6 +264,7 @@ struct SettingsRootView: View {
             }
         }
         .scrollContentBackground(backgroundActive ? .hidden : .automatic)
+        }
         .navigationTitle(settings.localized("Settings"))
         .toolbarBackground(backgroundActive ? .hidden : .automatic, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)

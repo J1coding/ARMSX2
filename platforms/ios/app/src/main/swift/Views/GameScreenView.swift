@@ -94,11 +94,6 @@ struct GameScreenView: View {
     @State private var menuButtonHidden = false
     @State private var vmMenuAvailable = false
     @State private var gameMenuAvailable = false
-    // Backs the Pacing HUD overlay (Plan 04.1-04). Polls ARMSX2Bridge.frameTimeHistory
-    // + audioBufferHealthMs every 500 ms; the overlay is mounted in both landscape and
-    // portrait, gated behind `settings.osdShowFrameTimes` so casual users see only the
-    // game.
-    @State private var pacingHUDModel = FramePacingHUDModel()
     // MARK: Overlay Route
     // The pause card + every screen launched from it are driven by one FSM. Opening a child
     // transitions `.paused -> .pausedPresenting(child)` without tearing the card down; the child
@@ -127,6 +122,13 @@ struct GameScreenView: View {
     // from SDL/core. Started when the menu is hidden during gameplay, stopped on restore.
     @State private var menuRestorePollTimer: Timer?
     @State private var lastControllerInputActive = false
+    // Orientation derived from the BODY GeometryReader (via GameScreenSizePreferenceKey),
+    // which is the geometry source SwiftUI reliably re-measures on rotation. The
+    // conditionally-presented `.overlay` subtrees (pause menu, per-game settings) are NOT
+    // re-measured by the hosting controller's rotation nudge, so we lift orientation here
+    // and key those overlay containers off it (`.id(screenIsLandscape)`) to force a fresh
+    // re-measure on a flip. See debug session `pause-menu-rotation-squish`.
+    @State private var screenIsLandscape = true
 
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -214,15 +216,6 @@ struct GameScreenView: View {
                             .accessibilityAddTraits(.isImage)
                             .accessibilityHint("VoiceOver image recognition can read on-screen text.")
                         AccessibilityHUDMirror()
-                        if settings.osdShowFrameTimes {
-                            // Pacing HUD (Plan 04.1-04) — sits ABOVE the game surface so the
-                            // readouts are visible over gameplay, but BELOW the virtual
-                            // controller so it never intercepts touch input. Gated behind the
-                            // existing `osdShowFrameTimes` debug-overlay toggle so casual users
-                            // see only the game (UI-SPEC §Scope Boundaries).
-                            FramePacingHUDOverlay(model: pacingHUDModel)
-                                .allowsHitTesting(false)
-                        }
                         if effectiveVirtualPadVisible {
                             VirtualControllerView(
                                 isLandscape: true,
@@ -249,15 +242,6 @@ struct GameScreenView: View {
                             .accessibilityAddTraits(.isImage)
                             .accessibilityHint("VoiceOver image recognition can read on-screen text.")
                             .overlay { AccessibilityHUDMirror() }
-                            .overlay(alignment: .top) {
-                                if settings.osdShowFrameTimes {
-                                    // Pacing HUD portrait mount (Plan 04.1-04). Same gate as the
-                                    // landscape ZStack; `.allowsHitTesting(false)` so pad input
-                                    // falls through to the game surface below.
-                                    FramePacingHUDOverlay(model: pacingHUDModel)
-                                        .allowsHitTesting(false)
-                                }
-                            }
 
                         if effectiveVirtualPadVisible {
                             ZStack {
@@ -284,7 +268,17 @@ struct GameScreenView: View {
             }
             .preference(key: GameScreenSizePreferenceKey.self, value: geo.size)
         }
-        .onPreferenceChange(GameScreenSizePreferenceKey.self) { _ in
+        .onPreferenceChange(GameScreenSizePreferenceKey.self) { size in
+            // The body GeometryReader is the one SwiftUI reliably re-measures on rotation
+            // (the existing `viewWillTransition` nudge in ARMSX2HostingController covers it).
+            // The conditionally-presented `.overlay` subtrees are NOT re-measured by that
+            // nudge, so we lift orientation here and key the overlay containers off it via
+            // `.id()` — forcing a fresh GameOverlayContainer (and its nested GeometryReader)
+            // to re-measure the now-portrait proposed size instead of staying stale-landscape.
+            let landscape = size.width > size.height
+            if screenIsLandscape != landscape {
+                screenIsLandscape = landscape
+            }
             syncFullscreenStateFromWindow()
         }
         .sheet(isPresented: childPresentedBinding(.saveStates)) {
@@ -344,10 +338,18 @@ struct GameScreenView: View {
                 GameOverlayContainer(safeAreaInsets: displaySafeAreaEdgeInsets, frameMode: .landscapePanel) { _ in
                     runtimePerGameSettingsContent
                 }
+                .id(screenIsLandscape)
             }
         }
         .overlay {
+            // `.id(screenIsLandscape)` forces GameOverlayContainer to rebuild on an
+            // orientation flip so its nested GeometryReader re-measures the new (portrait)
+            // proposed size instead of retaining the stale pre-rotation landscape size —
+            // the "pause menu squished after landscape→portrait rotation" bug. The rebuild
+            // is an instant swap (not tied to overlayRoute, so no presentation animation),
+            // masked by the device rotation itself.
             pauseMenuOverlay
+                .id(screenIsLandscape)
         }
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: overlayRoute)
         .alert(settings.localized("Reset ROM?"), isPresented: childPresentedBinding(.resetROM)) {
@@ -366,14 +368,12 @@ struct GameScreenView: View {
             refreshRuntimeMenuState()
             consumePendingRetroAchievementsToast()
             startMenuRestorePollingIfNeeded()
-            pacingHUDModel.startPolling()
         }
         .onDisappear {
             statusBanner.cancelDismiss()
             achievementsBanner.cancelDismiss()
             stopMenuRestorePolling()
             leaveGameplaySystemChromeMode()
-            pacingHUDModel.stopPolling()
         }
         // Single chokepoint for runtime pause: VM pause derives only from `overlayRoute`
         // (any non-hidden route keeps the VM paused), so one observer covers every child

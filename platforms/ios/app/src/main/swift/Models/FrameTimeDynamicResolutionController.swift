@@ -129,7 +129,7 @@ final class FrameTimeDynamicResolutionController {
 
     private func startTimer() {
         guard pollTimer == nil else { return }
-        // Canonical iOS pattern (mirrors FramePacingHUDModel): Timer + common
+        // Canonical iOS pattern: Timer + common
         // run-loop mode so the tick continues during tracking (e.g. pad drag).
         // The Task { @MainActor in ... } hop preserves actor isolation.
         let timer = Timer(timeInterval: Self.pollInterval, repeats: true) { [weak self] _ in
