@@ -1662,6 +1662,21 @@ final class SettingsStore {
         suppressINIWrites = true
         defer { suppressINIWrites = false }
 
+        // Phase 4.1: smart-detect Frame Pacing "Optimal" default migration (D-02).
+        // Runs once, writes ARMSX2iOS/Migrations/FramePacingOptimalDefaultV1 true
+        // unconditionally. Fresh installs on PCSX2 v1.0 defaults get .optimal +
+        // the D-01 table applied; any customized key yields .custom + preserved
+        // user values. MUST run BEFORE any stored property is read from INI so
+        // the post-migration values are authoritative for the reads below.
+        //
+        // CRITICAL: migrateFramePacingOptimalDefaultV1() writes INI directly via
+        // ARMSX2Bridge.setINI*. It MUST NOT touch SettingsStore.shared in any
+        // form — doing so re-enters the in-flight swift_once token of this very
+        // init() call, deadlocking dispatch_once on iOS 26.x (SIGTRAP "BUG IN
+        // CLIENT OF LIBDISPATCH") or producing doesNotRecognizeSelector on iOS
+        // 27 (SIGABRT). Guarded by test_ios_frame_pacing_migration_no_shared_access.py.
+        Self.migrateFramePacingOptimalDefaultV1()
+
         // CPU
         eeCoreType = Int(ARMSX2Bridge.getINIInt("EmuCore/CPU", key: "CoreType", defaultValue: 2))
         iopRecompiler = ARMSX2Bridge.getINIBool("EmuCore/CPU/Recompiler", key: "EnableIOP", defaultValue: true)
@@ -1832,13 +1847,9 @@ final class SettingsStore {
         controllerMultitapMode = Int(ARMSX2Bridge.getINIInt("ARMSX2iOS/Gamepad", key: "MultitapMode", defaultValue: 0))
         autoOpenStikDebug = ARMSX2Bridge.getINIBool("ARMSX2iOS/JIT", key: "AutoOpenStikDebug", defaultValue: false)
         jitScriptProtocol = Self.loadedJITScriptProtocol()
-        // Phase 4.1: smart-detect Frame Pacing "Optimal" default migration (D-02).
-        // Runs once, writes ARMSX2iOS/Migrations/FramePacingOptimalDefaultV1 true
-        // unconditionally. Fresh installs on PCSX2 v1.0 defaults get .optimal +
-        // the D-01 table applied; any customized key yields .custom + preserved
-        // user values. The stored property is then read back from the INI so the
-        // post-migration value is authoritative.
-        Self.migrateFramePacingOptimalDefaultV1()
+        // Phase 4.1: Frame Pacing migration has already run at the top of
+        // init() (see CRITICAL note there). The stored property reads below
+        // pick up the post-migration INI values.
         framePacingPreset = FramePacingPreset(rawValue: Int(ARMSX2Bridge.getINIInt("ARMSX2iOS/FramePacing", key: "Preset", defaultValue: Int32(FramePacingPreset.optimal.rawValue)))) ?? .optimal
         // Phase 4.1 Plan 06 (Item 9): Adaptive Resolution opt-in. The INI value
         // is read back here so a persisted ON state at app boot starts the
@@ -1848,17 +1859,6 @@ final class SettingsStore {
         // the persisted value.
         let _initialAdaptiveResolution = ARMSX2Bridge.getINIBool("ARMSX2iOS/FramePacing", key: "DynamicResolution", defaultValue: false)
         adaptiveResolutionEnabled = _initialAdaptiveResolution
-        // CRITICAL: this setEnabled call is deferred to the next runloop tick
-        // via DispatchQueue.main.async so it does NOT re-enter the in-flight
-        // swift_once token of this very init() call. Running it inline would
-        // have FrameTimeDynamicResolutionController.setEnabled read
-        // SettingsStore.shared.upscaleMultiplier — re-entering swift_once and
-        // deadlocking dispatch_once: iOS 26.x (SIGTRAP "BUG IN CLIENT OF LIBDISPATCH"),
-        // iOS 27 (SIGABRT via doesNotRecognizeSelector). Guarded by
-        // test_ios_settingsstore_init_no_shared_access.py.
-        DispatchQueue.main.async { [self] in
-            FrameTimeDynamicResolutionController.shared.setEnabled(self.adaptiveResolutionEnabled)
-        }
         dev9HddEnabled = ARMSX2Bridge.getINIBool("DEV9/Hdd", key: "HddEnable", defaultValue: false)
         dev9HddFile = ARMSX2Bridge.getINIString("DEV9/Hdd", key: "HddFile", defaultValue: "DEV9hdd.raw")
         dev9EthernetEnabled = ARMSX2Bridge.getINIBool("DEV9/Eth", key: "EthEnable", defaultValue: false)
@@ -1894,6 +1894,19 @@ final class SettingsStore {
         if !ARMSX2Bridge.getINIBool("ARMSX2iOS/UI", key: "OsdCustomSeeded", defaultValue: false) {
             snapshotCustomOsd()
             ARMSX2Bridge.setINIBool("ARMSX2iOS/UI", key: "OsdCustomSeeded", value: true)
+        }
+        // CRITICAL: this setEnabled call is deferred to the next runloop tick
+        // via DispatchQueue.main.async so it does NOT re-enter the in-flight
+        // swift_once token of this very init() call. Running it inline would
+        // have FrameTimeDynamicResolutionController.setEnabled read
+        // SettingsStore.shared.upscaleMultiplier — re-entering swift_once and
+        // deadlocking dispatch_once: iOS 26.x (SIGTRAP "BUG IN CLIENT OF LIBDISPATCH"),
+        // iOS 27 (SIGABRT via doesNotRecognizeSelector). The block also runs
+        // last in init() so the [self] capture observes every stored property
+        // already initialized (Swift 6 strict init-order on escaping captures).
+        // Guarded by test_ios_settingsstore_init_no_shared_access.py.
+        DispatchQueue.main.async { [self] in
+            FrameTimeDynamicResolutionController.shared.setEnabled(self.adaptiveResolutionEnabled)
         }
     }
 

@@ -520,6 +520,21 @@ void HostSys::EndCodeWrite()
 void HostSys::BeginCodeWriteRange(void* address, size_t size)
 {
 #if TARGET_OS_IPHONE
+	// [DEBUG ios18-jit-write-fault] Per-call W^X toggle trace (rate-limited).
+	// The crash is a permission fault at offset 0x48 into a 1 MB toggle
+	// window; we need to see every window flip around the first IOP block
+	// to know whether the page was RW or RX at the fault.
+	{
+		static int s_trace_count = 0;
+		if (s_trace_count < 64)
+		{
+			std::fprintf(stderr, "@@WX_RANGE@@ begin addr=%p size=0x%zx depth=%d mode=%d rw_off=%td\n",
+				address, size, s_code_write_range_full_depth,
+				static_cast<int>(DarwinMisc::GetJitMode()), DarwinMisc::g_code_rw_offset);
+			std::fflush(stderr);
+		}
+		s_trace_count++;
+	}
 	if (DarwinMisc::g_code_rw_offset == 0 &&
 		DarwinMisc::GetJitMode() == DarwinMisc::JitMode::Legacy && s_legacy_code_base &&
 		LegacyProtectCodeRange(address, size, PROT_READ | PROT_WRITE, "range_rw"))
@@ -533,6 +548,18 @@ void HostSys::BeginCodeWriteRange(void* address, size_t size)
 
 void HostSys::EndCodeWriteRange(void* address, size_t size)
 {
+#if TARGET_OS_IPHONE
+	{
+		static int s_trace_count = 0;
+		if (s_trace_count < 64)
+		{
+			std::fprintf(stderr, "@@WX_RANGE@@ end   addr=%p size=0x%zx depth=%d\n",
+				address, size, s_code_write_range_full_depth);
+			std::fflush(stderr);
+		}
+		s_trace_count++;
+	}
+#endif
 	if (s_code_write_range_full_depth > 0)
 	{
 		s_code_write_range_full_depth--;

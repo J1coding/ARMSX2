@@ -1,4 +1,4 @@
-"""Wave 0 Python guards for Item 6 (ProMotion panel lock): Info.plist key + SceneDelegate preferredFrameRateRange."""
+"""Wave 0 Python guards for Item 6 (ProMotion panel lock): Info.plist key + optional SceneDelegate preferredFrameRateRange hint."""
 import re
 import unittest
 from pathlib import Path
@@ -24,22 +24,72 @@ class TestIosFramePacingPromotion(unittest.TestCase):
         self.scene_delegate = self.SCENE_DELEGATE.read_text(encoding="utf-8")
 
     def test_info_plist_key_present(self):
-        """Info.plist.in contains CADisableMinimumFrameDurationOnPhone = true (Item 6 piece 1)."""
+        """Info.plist.in contains CADisableMinimumFrameDurationOnPhone = true (Item 6 piece 1).
+
+        This is the load-bearing ProMotion unlock — the actual opt-out of the
+        60 Hz cap on iPhone Pro / iPad Pro panels. SceneDelegate may optionally
+        also pin a preferredFrameRateRange hint, but that hint is not required
+        for the unlock to take effect.
+        """
         self.assertRegex(
             self.info_plist,
             r"(?m)^\s*<key>CADisableMinimumFrameDurationOnPhone</key>\s*\n\s*<true/>\s*$",
         )
 
-    def test_scenedelegate_sets_preferred_frame_rate_range(self):
-        """SceneDelegate.mm sets preferredFrameRateRange at scene-connect (Item 6 piece 2).
+    def test_scenedelegate_does_not_use_broken_uiupdatelink_initializer(self):
+        """Regression guard: SceneDelegate.mm must NOT call
+        -[UIUpdateLink initWithWindowScene:].
 
-        Accepts either UIWindowScene.preferredFrameRateRange (iOS 15–17 SDK) or
-        UIUpdateLink.preferredFrameRateRange (iOS 18+ SDK, where the property
-        moved in Xcode 26 / iOS SDK 26.5). The literal CAFrameRateRangeMake (or
-        CAFrameRateRange struct form) must appear nearby, with minimum:60 and
-        maximum+preferred bound to maximumFramesPerSecond.
+        That selector does not exist on UIUpdateLink. Calling it crashed the app
+        at every cold launch on iOS 26+/27 with NSInvalidArgumentException /
+        doesNotRecognizeSelector: (LiveContainer-2026-07-19 .ips, build v2.4.1 /
+        93fdb8fd45). The preferredFrameRateRange hint is optional — the
+        CADisableMinimumFrameDurationOnPhone Info.plist key alone is sufficient
+        to unlock >60 Hz on ProMotion panels.
         """
-        self.assertIn("preferredFrameRateRange", self.scene_delegate)
+        # Match the actual ObjC message-send form: a closing bracket
+        # (receiver expression) immediately before the selector, e.g.
+        # `[[UIUpdateLink alloc] initWithWindowScene:...]` or
+        # `[someLink initWithWindowScene:...]`. This avoids matching the
+        # selector name when it appears inside comments (where the `]`
+        # typically comes AFTER the selector, as in `-[UIUpdateLink initWithWindowScene:]`).
+        broken_selector_send = re.compile(r"\]\s*initWithWindowScene\s*:")
+        self.assertNotRegex(
+            self.scene_delegate,
+            broken_selector_send,
+            "SceneDelegate.mm must not send -[UIUpdateLink initWithWindowScene:] — "
+            "that selector does not exist on the class and crashed the app at every "
+            "cold launch on iOS 26+/27. See LiveContainer-2026-07-19 .ips and "
+            ".planning/debug/uiupdatelink-crash.md.",
+        )
+
+    def test_scenedelegate_preferred_frame_rate_range_hint_is_well_formed_if_present(self):
+        """If SceneDelegate.mm sets preferredFrameRateRange, it must be well-formed.
+
+        The hint is OPTIONAL — its absence is acceptable because the actual
+        ProMotion unlock is the CADisableMinimumFrameDurationOnPhone Info.plist
+        key (guarded by test_info_plist_key_present). If a contributor
+        reintroduces a preferredFrameRateRange hint, this test enforces that it:
+
+          * uses CAFrameRateRangeMake(60, ...) or (CAFrameRateRange){60, ...} form
+          * references maximumFramesPerSecond (so non-ProMotion devices get a
+            (60,60,60) no-op range)
+          * is wrapped in if (@available(iOS 15.0, *)) or if (@available(iOS 18.0, *))
+
+        It MUST NOT use -[UIUpdateLink initWithWindowScene:] to obtain the link
+        instance — that selector is enforced absent by
+        test_scenedelegate_does_not_use_broken_uiupdatelink_initializer.
+        """
+        assign_match = re.search(
+            r"\.preferredFrameRateRange\s*=", self.scene_delegate
+        )
+        if assign_match is None:
+            self.skipTest(
+                "preferredFrameRateRange hint is absent in SceneDelegate.mm — "
+                "acceptable, CADisableMinimumFrameDurationOnPhone unlocks ProMotion"
+            )
+
+        # Assignment is present — enforce the shape.
         opt_in_block_match = re.search(
             r"preferredFrameRateRange\s*=\s*CAFrameRateRangeMake\s*\(\s*60\s*,",
             self.scene_delegate,
@@ -60,24 +110,6 @@ class TestIosFramePacingPromotion(unittest.TestCase):
             "(non-ProMotion devices then get a (60,60,60) no-op range)",
         )
 
-    def test_scenedelegate_uses_available_guard(self):
-        """The preferredFrameRateRange opt-in is wrapped in `if (@available(...))`.
-
-        iOS SDK 26 moved UIWindowScene.preferredFrameRateRange onto UIUpdateLink
-        (iOS 18+), so we accept either the iOS 15.0 guard (legacy
-        UIWindowScene.preferredFrameRateRange) or the iOS 18.0 guard (modern
-        UIUpdateLink.preferredFrameRateRange).
-        """
-        # Find the assignment, not the first textual occurrence (which may be
-        # inside a comment block above the actual opt-in).
-        assign_match = re.search(
-            r"\.preferredFrameRateRange\s*=", self.scene_delegate
-        )
-        self.assertIsNotNone(
-            assign_match,
-            "preferredFrameRateRange assignment must be present (looking for "
-            "'.preferredFrameRateRange =' assignment, not just the symbol)",
-        )
         idx = assign_match.start()
         # Walk backwards up to 800 chars looking for either @available guard.
         window_start = max(0, idx - 800)
@@ -100,7 +132,7 @@ class TestIosFramePacingPromotion(unittest.TestCase):
         """Conservative Item 6 reading: no JIT/VM/EmuConfig.Cpu/NominalScalar contact in either diff.
 
         Info.plist.in is a build-time static manifest — it should never reference these symbols.
-        The new SceneDelegate preferredFrameRateRange opt-in must not introduce them either.
+        The SceneDelegate preferredFrameRateRange opt-in (if present) must not introduce them either.
         """
         forbidden = re.compile(
             r"NominalScalar|iPSX2_|DarwinMisc::JitMode|EmuConfig\.Cpu|vtlb|setVSyncMode"

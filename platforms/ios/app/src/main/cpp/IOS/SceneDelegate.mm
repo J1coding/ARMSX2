@@ -221,25 +221,15 @@
         self.window.backgroundColor = [UIColor systemGroupedBackgroundColor];
         [self.window makeKeyAndVisible];
 
-        // ProMotion panel lock (Item 6): unlock >60 Hz on iPhone Pro / iPad Pro panels.
-        // CADisableMinimumFrameDurationOnPhone in Info.plist.in is the prerequisite
-        // that lets an app opt out of the 60 Hz cap on iPhone; without it the
-        // preferredFrameRateRange call below is ignored. This opt-in tells UIKit
-        // the scene wants the panel's maximum refresh rate. Non-ProMotion devices
-        // report maximumFramesPerSecond = 60, so the range becomes (60, 60, 60)
-        // which is a no-op. PS2 content still runs at 60 FPS (clean 2:1).
-        //
-        // iOS SDK 26 removed UIWindowScene.preferredFrameRateRange; the modern
-        // home for this property is UIUpdateLink (iOS 18+). Pre-iOS-18 falls back
-        // to the Info.plist key alone, which is still sufficient to unlock >60 Hz
-        // — preferredFrameRateRange is only a preferred-max hint, not the unlock
-        // itself.
-        if (@available(iOS 18.0, *)) {
-            UIUpdateLink *frameRateLink = [[UIUpdateLink alloc] initWithWindowScene:windowScene];
-            NSInteger max = (NSInteger)windowScene.screen.maximumFramesPerSecond;
-            frameRateLink.preferredFrameRateRange = CAFrameRateRangeMake(60, max, max);
-            objc_setAssociatedObject(self.window, @selector(frameRateLink), frameRateLink, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        }
+        // ProMotion unlock for iPhone Pro / iPad Pro panels is provided by
+        // CADisableMinimumFrameDurationOnPhone in Info.plist.in — that key is
+        // the actual 60 Hz cap opt-out, and is sufficient on its own. A previous
+        // attempt to also pin preferredFrameRateRange via
+        // -[UIUpdateLink initWithWindowScene:] crashed at every cold launch on
+        // iOS 26+/27 (LiveContainer-2026-07-19 .ips): that selector does not
+        // exist on UIUpdateLink. The preferred-max hint is optional, so the call
+        // was removed. Do NOT reintroduce -[UIUpdateLink initWithWindowScene:];
+        // guarded by test_ios_frame_pacing_promotion.py.
 
 // Create game render view — SwiftUI MetalGameView (UIViewRepresentable) manages placement
         g_gameRenderView = [[ARMSX2GameView alloc] initWithFrame:CGRectZero];

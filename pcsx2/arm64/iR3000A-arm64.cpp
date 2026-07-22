@@ -1293,6 +1293,10 @@ static void iopRecRecompile(const u32 startpc)
 
 	armSetAsmPtr(recPtr, recPtrEnd - recPtr + _64kb, &s_iopConstantPool);
 	armStartBlock();
+	// [DEBUG ios18-jit-write-fault] Capture armAsm state immediately after
+	// the placement-new, before any VIXL emit. The first call (n=1) is the
+	// one that matters — the crash is on the first IOP block.
+	armLogIopRecDiag("iop_after_armStartBlock");
 
 	s_pCurBlock = PSX_GETBLOCK(startpc);
 	pxAssert(s_pCurBlock->GetFnptr() == (uptr)iopJITCompile);
@@ -1441,6 +1445,13 @@ StartRecomp:
 
 	if (!(psxpc & 0x10000000))
 		g_psxMaxRecMem = std::max((psxpc & ~0xa0000000), g_psxMaxRecMem);
+
+	// [DEBUG ios18-jit-write-fault] Capture armAsm state right before the
+	// block-finalization Str emits (armAsm->Str for psxRegs.cycle / pc) —
+	// this is the section whose inlined VIXL capacity check faults. armAsm
+	// MUST still equal s_armAsmStorage here; if it drifted, hypothesis A
+	// (pointer mix-up) is confirmed.
+	armLogIopRecDiag("iop_before_finalize");
 
 	if (psxbranch == 2)
 	{

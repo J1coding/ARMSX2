@@ -4227,21 +4227,113 @@ bool Achievements::IsUsingRAIntegration()
 	return false;
 }
 
-// Declared in the header but not yet implemented. Return false (no data) so
-// callers handle the unavailable case; all call sites check the bool result.
 bool Achievements::GetCurrentUserStats(UserStats* stats)
 {
-	return false;
+	auto lock = GetLock();
+	if (!s_client)
+		return false;
+
+	const rc_client_user_t* user = rc_client_get_user_info(s_client);
+	if (!user)
+		return false;
+
+	stats->username = user->username ? user->username : "";
+	stats->display_name = user->display_name ? user->display_name : "";
+	stats->points = user->score;
+	stats->softcore_points = user->score_softcore;
+	stats->unread_messages = user->num_unread_messages;
+	stats->avatar_path = GetUserBadgePath(user->username ? user->username : "");
+	return true;
 }
 
 bool Achievements::GetCurrentGameStats(GameStats* stats)
 {
-	return false;
+	auto lock = GetLock();
+	if (!s_client)
+		return false;
+
+	const rc_client_game_t* game = rc_client_get_game_info(s_client);
+	if (!game)
+		return false;
+
+	rc_client_user_game_summary_t summary;
+	std::memset(&summary, 0, sizeof(summary));
+	rc_client_get_user_game_summary(s_client, &summary);
+
+	stats->title = game->title ? game->title : "";
+	stats->icon_url = game->badge_url ? game->badge_url : "";
+	stats->icon_path = s_game_icon;
+	stats->rich_presence = s_rich_presence_string;
+	stats->game_id = game->id;
+	stats->unlocked_achievements = summary.num_unlocked_achievements;
+	stats->total_achievements = summary.num_core_achievements;
+	stats->unlocked_points = summary.points_unlocked;
+	stats->total_points = summary.points_core;
+	stats->has_achievements = rc_client_has_achievements(s_client) != 0;
+	stats->has_leaderboards = rc_client_has_leaderboards(s_client) != 0;
+	stats->has_rich_presence = rc_client_has_rich_presence(s_client) != 0;
+	return true;
 }
 
 bool Achievements::GetCurrentAchievementList(std::vector<AchievementInfo>* achievements)
 {
-	return false;
+	auto lock = GetLock();
+	if (!s_client || !achievements)
+		return false;
+
+	rc_client_achievement_list_t* list = rc_client_create_achievement_list(
+		s_client, RC_CLIENT_ACHIEVEMENT_CATEGORY_CORE_AND_UNOFFICIAL,
+		RC_CLIENT_ACHIEVEMENT_LIST_GROUPING_LOCK_STATE);
+	if (!list)
+		return false;
+
+	static constexpr u32 bucket_order[] = {
+		RC_CLIENT_ACHIEVEMENT_BUCKET_ACTIVE_CHALLENGE,
+		RC_CLIENT_ACHIEVEMENT_BUCKET_RECENTLY_UNLOCKED,
+		RC_CLIENT_ACHIEVEMENT_BUCKET_UNLOCKED,
+		RC_CLIENT_ACHIEVEMENT_BUCKET_ALMOST_THERE,
+		RC_CLIENT_ACHIEVEMENT_BUCKET_LOCKED,
+		RC_CLIENT_ACHIEVEMENT_BUCKET_UNOFFICIAL,
+		RC_CLIENT_ACHIEVEMENT_BUCKET_UNSUPPORTED,
+	};
+
+	achievements->clear();
+	for (u32 bucket_type : bucket_order)
+	{
+		for (u32 b = 0; b < list->num_buckets; b++)
+		{
+			const rc_client_achievement_bucket_t& bucket = list->buckets[b];
+			if (bucket.bucket_type != bucket_type)
+				continue;
+			for (u32 a = 0; a < bucket.num_achievements; a++)
+			{
+				const rc_client_achievement_t* ach = bucket.achievements[a];
+				if (!ach)
+					continue;
+
+				AchievementInfo info;
+				info.id = ach->id;
+				info.title = ach->title ? ach->title : "";
+				info.description = ach->description ? ach->description : "";
+				info.badge_path = GetAchievementBadgePath(ach, ach->state);
+				if (ach->measured_progress[0])
+					info.measured_progress = ach->measured_progress;
+				info.points = ach->points;
+				info.unlock_time = static_cast<u32>(ach->unlock_time);
+				info.state = ach->state;
+				info.category = ach->category;
+				info.bucket = bucket.bucket_type;
+				info.unlocked = ach->unlocked;
+				info.measured_percent = ach->measured_percent;
+				info.rarity = ach->rarity;
+				info.rarity_hardcore = ach->rarity_hardcore;
+				achievements->push_back(std::move(info));
+			}
+		}
+	}
+
+	rc_client_destroy_achievement_list(list);
+	return true;
 }
 
 #endif // ENABLE_RAINTEGRATION

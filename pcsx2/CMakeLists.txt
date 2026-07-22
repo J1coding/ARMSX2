@@ -1473,7 +1473,13 @@ if (APPLE)
 		)
 	endif()
 	# Weak-link MetalFX so older OS versions still load; each use is @available-guarded.
-	target_link_options(PCSX2_FLAGS INTERFACE "SHELL:-weak_framework MetalFX")
+	# Skip on iOS Simulator builds (ARMSX2_REAL_DEVICE=OFF): MetalFX.framework is
+	# absent from the iphonesimulator SDK and every source-level reference is
+	# compile-guarded by PCSX2_HAS_METALFX=0 (see GSDeviceMTL.h), so the link-time
+	# flag has nothing to resolve on sim and would fail with "framework not found".
+	if(ARMSX2_REAL_DEVICE OR NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+		target_link_options(PCSX2_FLAGS INTERFACE "SHELL:-weak_framework MetalFX")
+	endif()
 endif()
 
 set_property(GLOBAL PROPERTY PCSX2_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})

@@ -191,6 +191,66 @@ u8* armEndBlock()
 	return armAsmPtr;
 }
 
+// [DEBUG ios18-jit-write-fault] Diagnostic capture for the tester's log.
+// Logs armAsm vs s_armAsmStorage vs JIT-arena range so we can tell whether
+// the placement-new put the MacroAssembler in BSS (as the source says it
+// should) or in JIT memory (as the crash's fault address implies). Also
+// captures armAsm+0x48 — the exact address the faulting ldr reads — so the
+// tester's log can be matched against the .ips FAR byte-for-byte.
+//
+// Rate-limited per tag to the first 16 calls (the crash is on the first
+// IOP block, so the very first line is the one that matters; later lines
+// just confirm the state is stable across blocks). stderr + fflush so the
+// line lands in emulog before any SIGBUS terminates the process.
+void armLogIopRecDiag(const char* tag)
+{
+	static constexpr int kMaxPerTag = 16;
+	static constexpr int kMaxTags = 8;
+	static struct { const char* tag; int count; } slots[kMaxTags] = {};
+	int slot = -1;
+	for (int i = 0; i < kMaxTags; i++)
+	{
+		if (slots[i].tag == tag) { slot = i; break; }
+		if (slots[i].tag == nullptr) { slot = i; slots[i].tag = tag; break; }
+	}
+	if (slot < 0)
+		return;
+	const int n = ++slots[slot].count;
+	if (n > kMaxPerTag)
+		return;
+
+	const u8* const storage = &s_armAsmStorage[0];
+	void* const a = static_cast<void*>(armAsm);
+	const bool same = (reinterpret_cast<const u8*>(a) == storage);
+#ifdef __APPLE__
+	const uintptr_t jit_base = DarwinMisc::GetJitBase();
+	const uintptr_t jit_end = DarwinMisc::GetJitEnd();
+	const ptrdiff_t rw_off = DarwinMisc::g_code_rw_offset;
+	const int legacy = (DarwinMisc::GetJitMode() == DarwinMisc::JitMode::Legacy) ? 1 : 0;
+#else
+	const uintptr_t jit_base = 0, jit_end = 0;
+	const ptrdiff_t rw_off = 0;
+	const int legacy = 0;
+#endif
+	const bool a_in_jit = (jit_end > jit_base) &&
+		(reinterpret_cast<uintptr_t>(a) >= jit_base) &&
+		(reinterpret_cast<uintptr_t>(a) < jit_end);
+	const bool storage_in_jit = (jit_end > jit_base) &&
+		(reinterpret_cast<uintptr_t>(storage) >= jit_base) &&
+		(reinterpret_cast<uintptr_t>(storage) < jit_end);
+	std::fprintf(stderr,
+		"@@IOP_REC_DIAG[%s]@@ n=%d armAsm=%p storage=%p same=%d armAsmPtr=%p "
+		"armAsm+0x48=%p armAsm_in_jit=%d storage_in_jit=%d "
+		"jit=[0x%lx,0x%lx) rw_offset=%td legacy=%d\n",
+		tag, n, a, static_cast<const void*>(storage), (int)same,
+		armAsmPtr,
+		a ? static_cast<void*>(static_cast<u8*>(a) + 0x48) : nullptr,
+		(int)a_in_jit, (int)storage_in_jit,
+		static_cast<unsigned long>(jit_base), static_cast<unsigned long>(jit_end),
+		rw_off, legacy);
+	std::fflush(stderr);
+}
+
 void armDisassembleAndDumpCode(const void* ptr, size_t size)
 {
 #ifdef INCLUDE_DISASSEMBLER

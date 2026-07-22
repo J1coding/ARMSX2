@@ -67,10 +67,24 @@ protected:
 	{
 		// 4-byte aligned word stores are atomic on AArch64. `site` is the RX
 		// address; under iOS dual-map W^X the store goes through the RW alias
-		// (identity elsewhere). Callers hold an open Begin/EndCodeWrite scope
-		// for the toggle modes; on Darwin the "signal handler" caller is
-		// really the Mach exception-handler thread, so that scope is safe.
+		// (identity elsewhere).
+		//
+		// [ios18-jit-write-fault] The link site may be in a DIFFERENT 1 MiB W^X
+		// window than the caller's open BeginCodeWriteRange scope: block linking
+		// (New/Link) patches branch sites in EARLIER blocks at arbitrary arena
+		// offsets, and Remove() patches blocks anywhere in the arena. The
+		// caller's per-window scope (opened in armStartBlock) only flips
+		// [armAsmPtr, armAsmPtr+1MiB) to RW, leaving the site's page RX — and
+		// the store SIGBUS-faults (EXC_BAD_ACCESS / KERN_PROTECTION_FAILURE,
+		// WnR=1, DFSC=Permission). Open a per-site write scope so the site's
+		// page is RW for the store, then flip it back. Per-window (not
+		// whole-arena BeginCodeWrite) so the caller's emit window stays RW and
+		// we don't perturb concurrent MTVU compiles. On Darwin the "signal
+		// handler" caller is really the Mach exception-handler thread, so the
+		// mprotect inside BeginCodeWriteRange is safe here.
+		HostSys::BeginCodeWriteRange(reinterpret_cast<void*>(site), 4);
 		*reinterpret_cast<volatile u32*>(armGetWritableCodePtr(reinterpret_cast<u8*>(site))) = instr;
+		HostSys::EndCodeWriteRange(reinterpret_cast<void*>(site), 4);
 		// Then make sure cores fetching instructions see the new word.
 		// (HostSys::FlushInstructionCache, not the raw builtin: on Darwin the
 		// builtin lowers to a compiler-rt ___clear_cache call that the iOS

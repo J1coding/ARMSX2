@@ -37,6 +37,17 @@ extension SettingsStore {
     ///   overwrite their tuning).
     /// Either way, write the migration flag true unconditionally so this runs
     /// exactly once per install.
+    ///
+    /// CRITICAL: this function is invoked from `SettingsStore.init()` (see
+    /// SettingsStore.swift). It MUST NOT touch `SettingsStore.shared` in any
+    /// way — doing so re-enters the `swift_once` token that is currently
+    /// in-flight inside `init()`, producing a recursive dispatch_once deadlock
+    /// (`BUG IN CLIENT OF LIBDISPATCH: trying to lock recursively`, SIGTRAP on
+    /// iOS 26.x) or, on iOS 27, a `doesNotRecognizeSelector:` SIGABRT against
+    /// the partially-initialized instance. All preset writes go directly to INI
+    /// via ARMSX2Bridge.setINI*; SettingsStore.init() then reads those INI
+    /// values back into its stored properties when it continues.
+    /// Guarded by test_ios_frame_pacing_migration_no_shared_access.py.
     static func migrateFramePacingOptimalDefaultV1() {
         let migrated = ARMSX2Bridge.getINIBool("ARMSX2iOS/Migrations", key: "FramePacingOptimalDefaultV1", defaultValue: false)
         if migrated { return }
@@ -67,7 +78,22 @@ extension SettingsStore {
         if allDefaults {
             ARMSX2Bridge.setINIInt("ARMSX2iOS/FramePacing", key: "Preset", value: Int32(FramePacingPreset.optimal.rawValue))
             NSLog("[ARMSX2 iOS Settings] Frame Pacing migration: applying Optimal preset")
-            SettingsStore.shared.applyFramePacingPreset(.optimal)
+            // Apply the D-01 Optimal table directly to INI. Do NOT delegate to
+            // SettingsStore.shared.applyFramePacingPreset(.optimal) — that would
+            // re-enter the in-flight swift_once token (see CRITICAL note above).
+            // SettingsStore.init() reads these INI keys into its stored
+            // properties after this migration returns, so the post-migration
+            // values are authoritative.
+            //
+            // D-01 Optimal table (must mirror SettingsStore.applyFramePacingPreset):
+            //   vsyncQueueSize=4, audioOutputLatencyMs=15, audioBufferMs=50,
+            //   syncToHostRefresh=false, frameLimiterEnabled=true, targetFPS=60
+            //   (encoded as NominalScalar=1.0).
+            ARMSX2Bridge.setINIInt("EmuCore/GS", key: "VsyncQueueSize", value: 4)
+            ARMSX2Bridge.setINIInt("SPU2/Output", key: "OutputLatencyMS", value: 15)
+            ARMSX2Bridge.setINIInt("SPU2/Output", key: "BufferMS", value: 50)
+            ARMSX2Bridge.setINIBool("EmuCore/GS", key: "SyncToHostRefreshRate", value: false)
+            ARMSX2Bridge.setINIFloat("Framerate", key: "NominalScalar", value: 1.0)
         } else {
             ARMSX2Bridge.setINIInt("ARMSX2iOS/FramePacing", key: "Preset", value: Int32(FramePacingPreset.custom.rawValue))
             NSLog("[ARMSX2 iOS Settings] Frame Pacing migration: preserving user values as Custom")

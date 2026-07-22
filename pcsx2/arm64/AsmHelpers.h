@@ -142,6 +142,13 @@ u8* armStartBlock();
 u8* armEndBlock();
 
 void armDisassembleAndDumpCode(const void* ptr, size_t size);
+
+// [DEBUG ios18-jit-write-fault] One-shot diagnostic: capture armAsm/storage/
+// JIT-range state at tagged callsites so the tester's log can disambiguate
+// whether armAsm is a BSS pointer (hypothesis B: page-protection fault) or a
+// JIT pointer (hypothesis A: placement-new/thunk mix-up). Rate-limited per
+// tag to keep the log bounded; stderr+fflush so it lands before any SIGBUS.
+void armLogIopRecDiag(const char* tag);
 void armEmitJmp(const void* ptr, bool force_inline = false);
 void armEmitCall(const void* ptr, bool force_inline = false);
 // In-place patch: overwrite the 4-byte B at `code_address` with a branch to
