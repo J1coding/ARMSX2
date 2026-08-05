@@ -66,22 +66,26 @@
 static bool ARMSX2JITWorkerBusy();
 
 // TEMPORARY. Diagnostic for the landscape launch flash under host containers.
-// NSLog, not Console, because the PCSX2 file sink closes before this point.
-// Revert before merging.
+// fprintf to stderr, not NSLog: NSLog only reaches the redirected stderr once a
+// debugger is attached, which under LiveContainer is not until StikDebug has
+// run, so launch-time NSLog probes are lost. Revert before merging.
 static void ARMSX2LogLaunchGeometry(NSString *stage, UIWindow *win, UIViewController *rootVC, UIWindowScene *windowScene)
 {
     const CGSize winSize = win ? win.bounds.size : CGSizeZero;
     const CGSize vcSize = rootVC ? rootVC.view.bounds.size : CGSizeZero;
+    const CGSize menuSize = s_menuVC ? s_menuVC.view.bounds.size : CGSizeZero;
     const CGSize screenSize = windowScene ? windowScene.screen.bounds.size : CGSizeZero;
     const BOOL hosted = [[NSBundle mainBundle].bundlePath
         rangeOfString:@"/Documents/Applications/" options:NSCaseInsensitiveSearch].location != NSNotFound;
-    NSLog(@"[ARMSX2 iOS Layout] %@ win=%.0fx%.0f vc=%.0fx%.0f screen=%.0fx%.0f iface=%ld hosted=%d",
-          stage,
-          winSize.width, winSize.height,
-          vcSize.width, vcSize.height,
-          screenSize.width, screenSize.height,
-          windowScene ? (long)windowScene.interfaceOrientation : -1L,
-          hosted ? 1 : 0);
+    fprintf(stderr, "@@LAYOUT@@ stage=%s win=%.0fx%.0f vc=%.0fx%.0f menu=%.0fx%.0f screen=%.0fx%.0f iface=%ld hosted=%d\n",
+            stage.UTF8String,
+            winSize.width, winSize.height,
+            vcSize.width, vcSize.height,
+            menuSize.width, menuSize.height,
+            screenSize.width, screenSize.height,
+            windowScene ? (long)windowScene.interfaceOrientation : -1L,
+            hosted ? 1 : 0);
+    fflush(stderr);
 }
 
 @implementation PCSX2SceneDelegate
@@ -1281,6 +1285,18 @@ static void ARMSX2StartJITKeepalive()
 - (void)sceneDidDisconnect:(UIScene *)scene {
 }
 
+// TEMPORARY. Samples across the frames where the flash is visible, since one
+// reading at the hook itself lands either side of it. Revert before merging.
+- (void)sampleGeometryAfterStage:(NSString *)stage {
+    static const double kDelays[] = { 0.0, 0.05, 0.15, 0.40, 1.0, 2.0 };
+    for (size_t i = 0; i < sizeof(kDelays) / sizeof(kDelays[0]); i++) {
+        NSString *tag = [NSString stringWithFormat:@"%@+%.0fms", stage, kDelays[i] * 1000.0];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kDelays[i] * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            ARMSX2LogLaunchGeometry(tag, self.window, s_rootVC ?: self.window.rootViewController, self.window.windowScene);
+        });
+    }
+}
+
 - (void)sceneDidBecomeActive:(UIScene *)scene {
     // Under host containers that resolve the scene's orientation after
     // scene:willConnectTo: created the SDL window and its rootViewController,
@@ -1298,18 +1314,16 @@ static void ARMSX2StartJITKeepalive()
     const BOOL winLandscape = (winSize.width >= winSize.height && winSize.height > 0);
     const BOOL vcLandscape = (vcSize.width >= vcSize.height && vcSize.height > 0);
     ARMSX2LogLaunchGeometry(@"didBecomeActive-before", win, rootVC, win.windowScene);
-    NSLog(@"[ARMSX2 iOS Layout] snap fires=%d (winLandscape=%d vcLandscape=%d sizeMatches=%d)",
-          winLandscape != vcLandscape, winLandscape, vcLandscape,
-          CGSizeEqualToSize(winSize, vcSize));
+    fprintf(stderr, "@@LAYOUT@@ snap fires=%d winLandscape=%d vcLandscape=%d sizeMatches=%d\n",
+            winLandscape != vcLandscape, winLandscape, vcLandscape,
+            CGSizeEqualToSize(winSize, vcSize));
+    fflush(stderr);
     if (winLandscape != vcLandscape) {
         rootVC.view.frame = win.bounds;
         [rootVC.view setNeedsLayout];
         [rootVC.view layoutIfNeeded];
     }
-    ARMSX2LogLaunchGeometry(@"didBecomeActive-after", win, rootVC, win.windowScene);
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        ARMSX2LogLaunchGeometry(@"settled-2s", self.window, s_rootVC, self.window.windowScene);
-    });
+    [self sampleGeometryAfterStage:@"didBecomeActive"];
 
     // Prepare the persistent CPU/JIT worker while the launch-time JIT grant is
     // fresh, but leave it waiting without a VM boot request. Running this from
@@ -1332,6 +1346,10 @@ static void ARMSX2StartJITKeepalive()
 }
 
 - (void)sceneWillEnterForeground:(UIScene *)scene {
+    // TEMPORARY. This is the return from StikDebug, the one hook that runs
+    // before the first frame is drawn. Revert before merging.
+    ARMSX2LogLaunchGeometry(@"willEnterForeground", self.window, s_rootVC ?: self.window.rootViewController, self.window.windowScene);
+    [self sampleGeometryAfterStage:@"willEnterForeground"];
 }
 
 - (void)sceneDidEnterBackground:(UIScene *)scene {
