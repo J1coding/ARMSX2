@@ -65,6 +65,25 @@
 // Defined below, next to the VM worker state it reads.
 static bool ARMSX2JITWorkerBusy();
 
+// TEMPORARY. Diagnostic for the landscape launch flash under host containers.
+// NSLog, not Console, because the PCSX2 file sink closes before this point.
+// Revert before merging.
+static void ARMSX2LogLaunchGeometry(NSString *stage, UIWindow *win, UIViewController *rootVC, UIWindowScene *windowScene)
+{
+    const CGSize winSize = win ? win.bounds.size : CGSizeZero;
+    const CGSize vcSize = rootVC ? rootVC.view.bounds.size : CGSizeZero;
+    const CGSize screenSize = windowScene ? windowScene.screen.bounds.size : CGSizeZero;
+    const BOOL hosted = [[NSBundle mainBundle].bundlePath
+        rangeOfString:@"/Documents/Applications/" options:NSCaseInsensitiveSearch].location != NSNotFound;
+    NSLog(@"[ARMSX2 iOS Layout] %@ win=%.0fx%.0f vc=%.0fx%.0f screen=%.0fx%.0f iface=%ld hosted=%d",
+          stage,
+          winSize.width, winSize.height,
+          vcSize.width, vcSize.height,
+          screenSize.width, screenSize.height,
+          windowScene ? (long)windowScene.interfaceOrientation : -1L,
+          hosted ? 1 : 0);
+}
+
 @implementation PCSX2SceneDelegate
 
 #pragma mark - Scene connection & bootstrap
@@ -229,7 +248,9 @@ static bool ARMSX2JITWorkerBusy();
         uiWindow.windowScene = windowScene;
         self.window = uiWindow;
         self.window.backgroundColor = [UIColor systemGroupedBackgroundColor];
+        ARMSX2LogLaunchGeometry(@"before-makeKeyAndVisible", self.window, self.window.rootViewController, windowScene);
         [self.window makeKeyAndVisible];
+        ARMSX2LogLaunchGeometry(@"after-makeKeyAndVisible", self.window, self.window.rootViewController, windowScene);
 
         // ProMotion (120 Hz) unlock is just CADisableMinimumFrameDurationOnPhone
         // in Info.plist. Don't pin preferredFrameRateRange via
@@ -287,6 +308,7 @@ static bool ARMSX2JITWorkerBusy();
             }
             Console.WriteLn("[UI] SwiftUI menu attached (screen: %.0fx%.0f)",
                 rootVC.view.bounds.size.width, rootVC.view.bounds.size.height);
+            ARMSX2LogLaunchGeometry(@"menu-attached", self.window, rootVC, self.window.windowScene);
 
 }
     }
@@ -1275,11 +1297,19 @@ static void ARMSX2StartJITKeepalive()
     const CGSize vcSize = rootVC.view.bounds.size;
     const BOOL winLandscape = (winSize.width >= winSize.height && winSize.height > 0);
     const BOOL vcLandscape = (vcSize.width >= vcSize.height && vcSize.height > 0);
+    ARMSX2LogLaunchGeometry(@"didBecomeActive-before", win, rootVC, win.windowScene);
+    NSLog(@"[ARMSX2 iOS Layout] snap fires=%d (winLandscape=%d vcLandscape=%d sizeMatches=%d)",
+          winLandscape != vcLandscape, winLandscape, vcLandscape,
+          CGSizeEqualToSize(winSize, vcSize));
     if (winLandscape != vcLandscape) {
         rootVC.view.frame = win.bounds;
         [rootVC.view setNeedsLayout];
         [rootVC.view layoutIfNeeded];
     }
+    ARMSX2LogLaunchGeometry(@"didBecomeActive-after", win, rootVC, win.windowScene);
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        ARMSX2LogLaunchGeometry(@"settled-2s", self.window, s_rootVC, self.window.windowScene);
+    });
 
     // Prepare the persistent CPU/JIT worker while the launch-time JIT grant is
     // fresh, but leave it waiting without a VM boot request. Running this from
