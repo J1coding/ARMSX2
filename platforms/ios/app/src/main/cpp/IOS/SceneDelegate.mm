@@ -253,6 +253,7 @@ static void ARMSX2LogLaunchGeometry(NSString *stage, UIWindow *win, UIViewContro
         self.window = uiWindow;
         self.window.backgroundColor = [UIColor systemGroupedBackgroundColor];
         ARMSX2LogLaunchGeometry(@"before-makeKeyAndVisible", self.window, self.window.rootViewController, windowScene);
+        [self syncRootViewToWindow];
         [self.window makeKeyAndVisible];
         ARMSX2LogLaunchGeometry(@"after-makeKeyAndVisible", self.window, self.window.rootViewController, windowScene);
 
@@ -312,6 +313,7 @@ static void ARMSX2LogLaunchGeometry(NSString *stage, UIWindow *win, UIViewContro
             }
             Console.WriteLn("[UI] SwiftUI menu attached (screen: %.0fx%.0f)",
                 rootVC.view.bounds.size.width, rootVC.view.bounds.size.height);
+            [self syncRootViewToWindow];
             ARMSX2LogLaunchGeometry(@"menu-attached", self.window, rootVC, self.window.windowScene);
 
 }
@@ -1285,6 +1287,28 @@ static void ARMSX2StartJITKeepalive()
 - (void)sceneDidDisconnect:(UIScene *)scene {
 }
 
+/// A host container connects the scene while the app is still in the background,
+/// where UIKit has no interface orientation to resolve, so the SDL window gets the
+/// real landscape bounds while its root view controller starts portrait. The
+/// SwiftUI menu is pinned to that view, so it inherits the portrait size until
+/// something re-evaluates it. Snap the view to the window whenever the two
+/// disagree. No-op on the normal launch path, where they never do.
+- (void)syncRootViewToWindow {
+    UIViewController *rootVC = s_rootVC ?: self.window.rootViewController;
+    UIWindow *win = self.window;
+    if (rootVC == nil || win == nil) return;
+    if (CGSizeEqualToSize(rootVC.view.bounds.size, win.bounds.size)) return;
+
+    fprintf(stderr, "@@LAYOUT@@ snap win=%.0fx%.0f vc=%.0fx%.0f\n",
+            win.bounds.size.width, win.bounds.size.height,
+            rootVC.view.bounds.size.width, rootVC.view.bounds.size.height);
+    fflush(stderr);
+
+    rootVC.view.frame = win.bounds;
+    [rootVC.view setNeedsLayout];
+    [rootVC.view layoutIfNeeded];
+}
+
 // TEMPORARY. Samples across the frames where the flash is visible, since one
 // reading at the hook itself lands either side of it. Revert before merging.
 - (void)sampleGeometryAfterStage:(NSString *)stage {
@@ -1298,31 +1322,8 @@ static void ARMSX2StartJITKeepalive()
 }
 
 - (void)sceneDidBecomeActive:(UIScene *)scene {
-    // Under host containers that resolve the scene's orientation after
-    // scene:willConnectTo: created the SDL window and its rootViewController,
-    // rootVC.view keeps its portrait bounds and nothing re-evaluates it, so
-    // the SwiftUI menu (pinned to rootVC.view via Auto Layout) renders in a
-    // portrait square inside a landscape window. When rootVC.view and the
-    // window disagree on orientation, snap the view to the window bounds and
-    // let Auto Layout propagate to the menu. No-op on the normal launch path.
-    UIViewController *rootVC = s_rootVC ?: self.window.rootViewController;
-    UIWindow *win = self.window;
-    if (rootVC == nil || win == nil) return;
-
-    const CGSize winSize = win.bounds.size;
-    const CGSize vcSize = rootVC.view.bounds.size;
-    const BOOL winLandscape = (winSize.width >= winSize.height && winSize.height > 0);
-    const BOOL vcLandscape = (vcSize.width >= vcSize.height && vcSize.height > 0);
-    ARMSX2LogLaunchGeometry(@"didBecomeActive-before", win, rootVC, win.windowScene);
-    fprintf(stderr, "@@LAYOUT@@ snap fires=%d winLandscape=%d vcLandscape=%d sizeMatches=%d\n",
-            winLandscape != vcLandscape, winLandscape, vcLandscape,
-            CGSizeEqualToSize(winSize, vcSize));
-    fflush(stderr);
-    if (winLandscape != vcLandscape) {
-        rootVC.view.frame = win.bounds;
-        [rootVC.view setNeedsLayout];
-        [rootVC.view layoutIfNeeded];
-    }
+    ARMSX2LogLaunchGeometry(@"didBecomeActive-before", self.window, s_rootVC ?: self.window.rootViewController, self.window.windowScene);
+    [self syncRootViewToWindow];
     [self sampleGeometryAfterStage:@"didBecomeActive"];
 
     // Prepare the persistent CPU/JIT worker while the launch-time JIT grant is
@@ -1349,6 +1350,7 @@ static void ARMSX2StartJITKeepalive()
     // TEMPORARY. This is the return from StikDebug, the one hook that runs
     // before the first frame is drawn. Revert before merging.
     ARMSX2LogLaunchGeometry(@"willEnterForeground", self.window, s_rootVC ?: self.window.rootViewController, self.window.windowScene);
+    [self syncRootViewToWindow];
     [self sampleGeometryAfterStage:@"willEnterForeground"];
 }
 
