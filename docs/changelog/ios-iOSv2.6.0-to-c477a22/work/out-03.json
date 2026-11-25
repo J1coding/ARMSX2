@@ -1,0 +1,90 @@
+{
+  "items": [
+    {
+      "cat": "speed",
+      "title": "New VU1 compiler for faster games",
+      "text": "The new VU1 compiler is now on by default, and its saved compiled code is kept in memory with one file per game, so slow storage no longer stalls save state loads or quitting. Turning the compiler off clears its saved code.",
+      "shas": ["80befbb", "6e0ebaa", "bd2a84c", "864a9de", "ed5d361", "f358683", "5b9c187", "f3c95d6", "da6f9a4"]
+    },
+    {
+      "cat": "settings",
+      "title": "Automatic Performance Tuning option",
+      "text": "A new Automatic Performance Tuning switch in the emulator settings tries lower resolution, blending accuracy and other options on its own when a game runs slow, keeps what helps and says so on screen. It is off by default, and changing one of those settings by hand turns it off for that game.",
+      "shas": ["2405382", "58376ba", "bf6915b", "1da8c79", "d781184", "1c9461c", "0ea1db3", "bbf0ec3", "5cc29df", "a2ab549", "86be414", "969c794", "ca2ed33", "80fabe8", "412d7b1", "63b5660", "861814e", "92e9afb", "8821078", "a755ba9", "568f4cb", "c43b085", "64f1c8f", "e8350c3", "6ccfbef", "79540f6", "9b68a51", "5815a55", "c2c5e11", "0823538", "a500d30", "99b6c43", "d279a66"]
+    },
+    {
+      "cat": "speed",
+      "title": "Smoother automatic CPU clock tuning",
+      "text": "A new opt-in option, also used by Automatic Performance Tuning, lowers the emulated CPU's clock when a device cannot keep up. Changing the clock now patches compiled code in place instead of resetting it, so there is no big pause.",
+      "shas": ["ba87862", "3b78cc4", "5379724", "29003fb", "62e63ad", "81d75b1", "6154423", "9463946", "cc53a99", "f8f13bc", "71271c8", "fbed055", "9ca4723", "91ac6f1", "4035496", "719c893", "1df365b", "aadcc55", "a96d359"]
+    },
+    {
+      "cat": "graphics",
+      "title": "Comb-adaptive deinterlace for movies",
+      "text": "A new opt-in deinterlace for movies shown in frame mode removes combing only where the two fields differ, instead of smearing it into a blur, as seen in the Time Crisis II intro.",
+      "shas": ["bf3b664"]
+    },
+    {
+      "cat": "accuracy",
+      "title": "Fixes 4-bit image upload placement",
+      "text": "4-bit image uploads with an odd width or an odd starting position now land where the console puts them.",
+      "shas": ["02a2e4e", "c66d053"]
+    },
+    {
+      "cat": "speed",
+      "title": "Faster software renderer copies",
+      "text": "The software renderer now copies 32-bit texture sprites into 32-bit frames straight from memory, including half-size blits, which helps games like Stuntman and Call of Duty 2 that draw many sprites a frame.",
+      "shas": ["85ce341", "82e2217", "9eb5d7f", "ca84885"]
+    },
+    {
+      "cat": "speed",
+      "title": "Faster texture cache and drawing",
+      "text": "Render targets covered by several dirty areas are retired sooner, and some draws whose blend is not needed keep the previous pipeline, so the hardware renderer does less work.",
+      "shas": ["d6e62ba", "33cee24"]
+    },
+    {
+      "cat": "games",
+      "title": "Shadow of the Colossus shadow counting",
+      "text": "Shadow of the Colossus counts its shadow volumes in a hidden buffer that depends on exact wraparound. Those draws are now done at native resolution so the counting stays exact when upscaling.",
+      "shas": ["be7618d"]
+    },
+    {
+      "cat": "graphics",
+      "title": "Screen edges trimmed when upscaling",
+      "text": "When the hardware renderer runs at 2x or higher, one native pixel is trimmed from every edge of the picture to hide stray garbage along the border.",
+      "shas": ["82f1eaf"]
+    },
+    {
+      "cat": "graphics",
+      "title": "Texture pack list from one catalog",
+      "text": "The texture pack browser now loads its list only from the official ps2ktxpak catalog and no longer falls back to another catalog whose pack ids do not match.",
+      "shas": ["cdd19c5"]
+    },
+    {
+      "cat": "controls",
+      "title": "Resting triggers no longer hold L2 or R2",
+      "text": "A controller trigger that rests slightly above zero is no longer counted as L2 or R2 held down.",
+      "shas": ["9f5e6f7"]
+    },
+    {
+      "cat": "graphics",
+      "title": "Filters fit rotated displays correctly",
+      "text": "With Display Rotation at 90 or 270 degrees, the shader chain, Bilinear (Sharp) and CAS now size themselves to the rotated picture.",
+      "shas": ["ea828e7"]
+    },
+    {
+      "cat": "games",
+      "title": "Another Century's Episode 3 freeze fixed",
+      "text": "Another Century's Episode 3 no longer freezes a few seconds into play with a DECI2 Panic error when using the recompiler.",
+      "shas": ["f21b1d6"]
+    }
+  ],
+  "skipped": [
+    {"shas": ["49a7c02", "c39adae", "d0f5429", "0db0351", "dddac98", "f104891", "73ed88a", "6e69ba8", "4a53a74", "1a57c9e", "e10be8f", "4a13ff9", "49db8a1", "a360e50", "b418385", "fc9dadd", "8cbde69", "a20f053", "247be82"], "why": "internal"},
+    {"shas": ["b88b234", "a93a01d", "4365c74", "140f8f8", "2a729bd"], "why": "tests"},
+    {"shas": ["ea88b5c", "109f710"], "why": "build"},
+    {"shas": ["727e84b", "a3b060f", "e8a657c", "c684ed6", "a0c0b5f", "df71b3f", "2309d7a", "c40283d", "e2f01ef", "d1a0959", "79e3c54", "e2be9d6", "7649b2b", "495b256", "444f9e8", "7e56792", "31c02c4", "3e39fb3", "0832ea6", "b80e44a", "8e804ae", "c9a9ec4", "03b472e", "73dfb56", "ce925fb", "fba945e", "b20af75", "83fe4e2", "c618ff4", "57a277c", "65fd14b", "5f09fcb", "a888aec"], "why": "no-effect"},
+    {"shas": ["38e1049", "f28170b", "545e137", "704df6d", "10b6aa2", "8a06e22", "11d6185", "93fb00b", "363bc31", "b276f04", "2fda5df", "99245ef", "f3158a3", "7f91441", "4827f2b"], "why": "other-platform"}
+  ],
+  "unsure": []
+}

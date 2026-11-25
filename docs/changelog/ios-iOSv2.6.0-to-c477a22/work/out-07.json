@@ -1,0 +1,23 @@
+{
+  "items": [
+    {"cat": "accuracy", "title": "CPU timing follows a real console model", "text": "The emulated CPU now charges time using a model of how the real console issues pairs of instructions, instead of a fixed cost for each one. It is checked against timings measured on a real SCPH-30001 console and applies in both CPU engines.", "shas": ["52cd8ec", "8fa786e", "bf91ad6", "25b7a70", "3485228", "606889c", "73583d0", "dcbf27a"]},
+    {"cat": "accuracy", "title": "Rare vector unit edge cases fixed", "text": "Fixed several rare cases where the VU1 vector unit, which many games use for 3D geometry, behaved differently from a real console. These involve branches in delay slots and code that runs or loads past the end of its memory.", "shas": ["3863266", "e7d63f1", "fdf3192", "ee063a5", "494f729", "41a3dff", "2f8f90d", "5ce203e", "c7affe4"]},
+    {"cat": "speed", "title": "Fewer VU1 recompiles, kept between launches", "text": "Games that move their 3D geometry routines around in memory no longer make the emulator compile the same routine again and again. Compiled routines, including their optimized versions, are also saved in the game's cache, so later launches start with less compiling.", "shas": ["df19764", "6085d2e", "35952a1", "5b10228", "3f847c4", "11ca956", "8e49eff", "334ae3a", "10f591b", "80c95ed", "0c6b0f7", "f36a4d1", "c99e2e3", "5f88d37", "2228eba", "9827c10", "a6786a2", "5a185ab", "49a1871", "f818076", "ecd04b6", "68ef54e", "225e0fc", "6346cc2"]},
+    {"cat": "graphics", "title": "Metal fixes for second alpha pass", "text": "Fixed wrong output in the Metal renderer for draws that need a second alpha pass. That pass could draw internal ID values instead of the picture, and its depth workaround was wrong.", "shas": ["61d243a", "8bfff18"]},
+    {"cat": "games", "title": "Game patches updated to latest release", "text": "The bundled game patches now come straight from the latest PCSX2 patches release, published 2026-11-09, which holds 4,719 patch files.", "shas": ["c5567b9"]},
+    {"cat": "fixes", "title": "Deleting a DNS host no longer crashes", "text": "Swiping away an Internal DNS host no longer crashes the app when that row's text field was still selected. Deleted hosts also no longer leave an empty entry behind in the settings.", "shas": ["8e0b25a", "cdcd6f5"]},
+    {"cat": "controls", "title": "Better keyboard navigation in menus", "text": "Holding an arrow key on a keyboard now keeps moving through menus the way a held d-pad does. In the Use Controller Navigation? alert, Return and space now press the highlighted button.", "shas": ["0297758", "c85c9cd"]},
+    {"cat": "fixes", "title": "More reliable startup and scene reconnects", "text": "Fixed several problems when the app's scene reconnects while a game is running, including a game picture that could be lost and a boot request that could start the game twice. Startup also reads and writes the settings file more safely, so a settings change can no longer be overwritten by an old copy.", "shas": ["84e9ea3", "2362618", "49105b6", "224a9bd", "936542f", "b163fcc", "fe613ca"]},
+    {"cat": "controls", "title": "New touch pad layout editor", "text": "A new editor opens from Settings > Virtual Pad > Edit Layout, the pause menu, Per-Game Settings > Pad and the library's game menu. You can move, size and fade pad pieces from 10 percent to full opacity, including the whole D-pad or face button cluster as one piece.", "shas": ["1e686c1", "2239155", "0cbf8a8", "f9dd737"]},
+    {"cat": "controls", "title": "Floating sticks and L3 R3 in layouts", "text": "Each stick in a pad layout can now float or not, overriding the global Dynamic Thumbsticks setting, and can have its own touch zone. L3 and R3 buttons can be shown, placed and sized like Select and Start, and they start hidden so existing layouts play as before.", "shas": ["06947af", "c477a22"]}
+  ],
+  "skipped": [
+    {"shas": ["871fe1f", "170ba00"], "why": "other-platform"},
+    {"shas": ["63b3ada"], "why": "tests"},
+    {"shas": ["5b0c796", "25448b0", "f3601c0", "ce89ca7", "0b0aca0", "1834ab1"], "why": "build"},
+    {"shas": ["bc0d4bc", "52b9fd7"], "why": "reverted"},
+    {"shas": ["28a33f4"], "why": "no-effect"},
+    {"shas": ["dcb303f", "95e0b32", "2f40cda", "937cde0", "1b5917d", "f6472ca", "c5688a5", "8d4befe", "b3059c6", "bd4481a", "63f2967", "0673f21", "cfc406d", "a1709b2", "5438e64", "76d09e7", "f0df47b", "9db36a6", "d8b8223", "81a03a2", "63d10a4", "ff165b5", "f8921c1", "e9b87f5", "8083431", "27dd96c", "d6fafbd", "cc66802", "b2a625c", "f880242", "da3491f", "97e425c", "321ddf7", "6dee581", "59dcc01", "c91ea42", "90303b0", "1b7e6c9"], "why": "internal"}
+  ],
+  "unsure": ["965cbb1", "315f64c"]
+}

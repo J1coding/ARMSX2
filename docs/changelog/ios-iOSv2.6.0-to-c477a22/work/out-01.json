@@ -1,0 +1,90 @@
+{
+  "items": [
+    {
+      "cat": "new",
+      "title": "Namco System 246/256 arcade game support",
+      "text": "Adds emulation of Namco System 246 and 256 arcade boards, including their hard drive and disc images. Arcade games appear in the game list as games, and each one starts on the arcade BIOS it needs.",
+      "shas": ["5424ccf", "27b8431", "8d3c9a4", "6a4fb6d", "1d50218", "4367a7e", "f52965d"]
+    },
+    {
+      "cat": "controls",
+      "title": "Arcade controls, coins and light gun",
+      "text": "Each arcade game gets its own control layout, and a controller now drives the cabinet's switches directly. Hotkeys insert coins and open the Service and Test screens, and a mouse click fires the light gun.",
+      "shas": ["5277709", "df4675f", "bc51046", "9eb6584", "7ca3391", "cdb8e8d"]
+    },
+    {
+      "cat": "fixes",
+      "title": "Arcade hard drive and save fixes",
+      "text": "Big arcade hard drive images now open, and what a game writes to its drive is kept. A game's settings and high scores are no longer wiped after a read problem, and the board resets cleanly each time.",
+      "shas": ["b86ecd8", "ce8b588", "93013af", "f497fca", "ed7f907"]
+    },
+    {
+      "cat": "games",
+      "title": "Soul Calibur II arcade fixes",
+      "text": "Soul Calibur II now starts with its Conquest card, so opponents' AI plays correctly, and rebuilding the card from the test menu works.",
+      "shas": ["f75bf31", "0656b71"]
+    },
+    {
+      "cat": "fixes",
+      "title": "Arcade BIOS left out of console lists",
+      "text": "Arcade board BIOS files no longer show up in the console BIOS lists or get picked for a console game, which they cannot run.",
+      "shas": ["6741154", "f715070"]
+    },
+    {
+      "cat": "fixes",
+      "title": "Fixes launch crash on older iPads",
+      "text": "The app now opens on the iPad 6th and 7th generation, which crashed right at launch on iPadOS 17.7.",
+      "shas": ["67be95a"]
+    },
+    {
+      "cat": "fixes",
+      "title": "Texture pack loading fixes",
+      "text": "Replacement textures that finish loading late no longer stay in memory forever, and reloading or cancelling texture packs no longer collides with the loader.",
+      "shas": ["455cd76", "1a94b22", "1007647"]
+    },
+    {
+      "cat": "graphics",
+      "title": "Texture packs keep opaque surfaces solid",
+      "text": "Replacement textures whose alpha was a little off the game's opaque value could fail the game's alpha test and drop out. They are now treated as opaque, which helps games like River King, Sly and Armored Core 3.",
+      "shas": ["dbfe399"]
+    },
+    {
+      "cat": "graphics",
+      "title": "New 2x and 4x texture upscaler",
+      "text": "A new texture upscaling setting, off by default, enlarges game textures 2x or 4x in the background using filters trained on PS2 textures. It keeps hard edges and flat colour swatches exact so games that depend on them still look right.",
+      "shas": ["d2b83f0", "20cf735", "4332b6b", "cafe183", "e1dc6ad", "af8a24b", "dbb4019", "15c071a", "ee673cb", "dd2beae", "091a8b3", "fc79f32", "49709ad"]
+    },
+    {
+      "cat": "speed",
+      "title": "Faster texture cache and drawing",
+      "text": "Textures are hashed and updated with less copying and repeated work, so texture-heavy scenes cost less on the hardware renderer, for example in Burnout 3.",
+      "shas": ["1ac6559", "e59f27f", "e367b35", "3f12087", "bb2cff6"]
+    },
+    {
+      "cat": "speed",
+      "title": "Faster vector unit emulation",
+      "text": "Small improvements to the vector unit recompiler and its VU0 sync path do the same work with fewer instructions, so games that lean on it run a little faster.",
+      "shas": ["dda92c2", "2a292d3"]
+    },
+    {
+      "cat": "speed",
+      "title": "Faster main CPU emulation",
+      "text": "The main CPU's per-frame event checks and system calls do less work, trimming overhead so games run a little faster.",
+      "shas": ["daf5d9d", "2ccc2f9", "93ecea5", "aa0ce7a", "2fdd5ae"]
+    },
+    {
+      "cat": "speed",
+      "title": "New VU1 compiler for faster games",
+      "text": "A new whole-program compiler for the PS2's vector unit 1 is being built on top of the existing one, producing tighter code for hot programs so geometry-heavy games can run faster.",
+      "shas": ["de4ff08", "71372b3", "2c353a3", "af09c11", "de2589e", "cbdf634", "1f62de1", "2ae3d24", "693782a", "093c745", "ef01284", "948bbab", "fe23cf1", "f457c48", "1aef869", "c689416", "ad04245", "2ab92c0", "d17622f"]
+    }
+  ],
+  "skipped": [
+    {"shas": ["6ff0a6e", "1c79ac6", "211b56a", "2dbb90d", "a7d3022", "9df2a75", "374bc31", "7040244", "b53ae95", "e7d1a24", "6d2c3b5", "3447d1c", "8af4f36", "0a48c1c", "de02bb2", "8337a2e", "ee80265", "9381b8e", "8f9e364"], "why": "other-platform"},
+    {"shas": ["5fdcf13", "268e779", "bd6ee41"], "why": "build"},
+    {"shas": ["cbf5354", "46c06fe", "b1f3196", "8a19cbe", "da04cca", "0897453", "d4b6710", "6d11c7f", "5579c05", "c1ea9f2", "e019dfd", "3a9f180", "7f22812", "9314bf8", "facfa98", "7609a36", "a51bcd0", "e07bb27", "2374bde", "228e6e8", "8d28eb5", "f912ff5", "f7559d1", "2e3d9bd", "25c2864", "00f3931", "c46366f", "6a280f0", "b8098e6", "495f073"], "why": "internal"},
+    {"shas": ["3680288"], "why": "tests"},
+    {"shas": ["7ee071a", "0eb9177", "fd0ffc9", "42ae84b", "692f52e", "4d32bb8", "1e68a8b", "755da3c", "43fe811", "9b22d14", "b785ff5", "51b7e03", "e287101", "f9571db", "6c15bbd", "c4997db", "a55fd4c", "ff2b360", "11bd37a", "ec61487", "1916e31", "b49fcb2", "6f3491c"], "why": "no-effect"}
+  ],
+  "unsure": ["be9ef7e", "042f9ea", "71783e2"]
+}

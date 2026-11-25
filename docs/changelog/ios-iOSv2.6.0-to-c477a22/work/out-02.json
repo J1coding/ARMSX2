@@ -1,0 +1,54 @@
+{
+  "items": [
+    {
+      "cat": "speed",
+      "title": "New VU1 compiler for faster games",
+      "text": "The new compiler for the PS2's vector unit 1 gains many optimizations and now builds its code on a background thread, with the existing compiler as fallback. It also saves what it compiled on disk so later runs start faster.",
+      "shas": ["e1158ce", "9088d49", "2a1ca8f", "ea51085", "a3ae7e0", "22591fd", "933d9fc", "d154619", "973b993", "c8f680f", "3d39c6c", "60c7c95", "bef1639", "2e8c7d5", "49bdf3e", "b455172", "e9f5efd", "d9373af", "ff28f8d", "23c2b63", "c218c3b", "2ae7f84", "6f3ccd3", "034304a", "3391170", "6951a4a", "d1e0419", "ec0ad43", "a2a733f", "9be446b", "c3ee3a0", "ed7289e", "09adc1b", "72bc40a", "1c972bb", "09f2d1e", "3a91d37", "1faae0b", "5bb52ea", "5403091", "a8fa090", "8ab3ab1", "32bf469", "8a1fb53", "92263de", "fa2e152", "e63c22a", "b3c6f1c", "be346c8", "88f53bc", "4edea47", "dcf63f5", "5c7f03e", "667fc81", "7e6c11f", "fc895d2", "e4b4c6b", "8cb3707", "cda9296", "5ab06ea", "4649d8b", "fcac241", "e087813", "221d99c", "e933ec0", "1fc4d93", "11d6aaf", "011b21c", "a3e8850", "f67a1fc", "c18a651", "b8a3767", "6c64d70", "912e124", "95747a7", "d58b6d8", "9c5189f", "ce5e9a8", "8c84cb7", "a463ebe"]
+    },
+    {
+      "cat": "speed",
+      "title": "Faster vector unit emulation",
+      "text": "Many small improvements to the recompiled vector unit code do the same work with fewer instructions, so games that lean on it run a little faster.",
+      "shas": ["b3ad0eb", "b29cb14", "127e815", "057f5cb", "b312252", "06cab3b", "2a054d6", "795632e", "c7e7ec9", "748d8d9", "3d28f68", "b637c58", "aa30f99", "262e85b", "2a8ff44", "ca92bed", "348bb28", "dec87ee", "fac807d", "86a94fa", "29b244f"]
+    },
+    {
+      "cat": "accuracy",
+      "title": "Vector unit interpreter timing matches console",
+      "text": "The vector unit interpreter now handles a branch after two writes to the same register, a read that must wait for a load, and the end of a program the way the real console does.",
+      "shas": ["8e69821", "8192b58", "e98f4ee"]
+    },
+    {
+      "cat": "accuracy",
+      "title": "Empty vector unit writes now match console",
+      "text": "A vector unit instruction that writes no fields no longer changes registers on the recompiler, matching the interpreter and the console.",
+      "shas": ["eb205ba"]
+    },
+    {
+      "cat": "saves",
+      "title": "Save states load correctly with MTVU",
+      "text": "Loading a save state while VU1 runs on its own thread (MTVU) no longer swaps VU1's memory back to what it held before the load.",
+      "shas": ["1012c38", "aab3d90"]
+    },
+    {
+      "cat": "speed",
+      "title": "Faster texture cache and drawing",
+      "text": "Paletted textures are matched by cheaper block hashes, uploads reuse work already done and the texture cache holds more entries, which cuts per-frame work in texture-heavy scenes such as Baldur's Gate: Dark Alliance.",
+      "shas": ["f7c764d", "2a3de16", "738c228", "fdc74cb", "dcbc2be", "c608d27"]
+    },
+    {
+      "cat": "speed",
+      "title": "Faster software renderer copies",
+      "text": "The software renderer copies paletted texture sprites into 16-bit frames straight from memory, which helps games like Spider-Man 3 that redraw thousands of tiny sprites a frame.",
+      "shas": ["ea1a753", "4e51495"]
+    }
+  ],
+  "skipped": [
+    {"shas": ["2def6e6", "bd46a98", "bf87ca3", "1198898", "002a2ba", "3687dba", "f582265", "6cba7d8", "4a436a8", "b04e2ae", "a336fc2", "19e1820", "93a27bd", "8a10089", "0972dc2", "6bed830", "48c36f1", "38b43c4", "d1b88eb", "e218fb9", "749c473", "2a090f1", "b62a3fd", "7969d32"], "why": "internal"},
+    {"shas": ["45faf6e", "69db263"], "why": "tests"},
+    {"shas": ["d85f863"], "why": "build"},
+    {"shas": ["ade4b93", "ad30a81", "4d3a34b", "851202e", "93a3a91", "048b99c"], "why": "no-effect"},
+    {"shas": ["34af075"], "why": "other-platform"}
+  ],
+  "unsure": ["a989b4e"]
+}

@@ -1,0 +1,566 @@
+3399ccc	android-only	Android: Namco System 246/256 arcade games
+eba8b94	android-only	Android: make Arcade's state on the main thread, before the first frame
+3ee0b35	android-only	Arcade: name an imported dongle by what it holds (.ps2 with ECC)
+f098a99	android-only	Arcade import: unpack gzipped dumps, refuse a dongle under 8 MB
+2511779	android-only	Library: arcade game covers from ARMSX2's own arcade covers
+29097d6	android-only	Library: arcade games' 3D covers in the 3D cover style
+50eb980	android-only	Library: arcade covers are the same real art in either cover style
+96a6a72	android-only	Library: arcade covers from covers.ps2ktxpak.net, also for Discord friends
+ad08dc4	android-only	Arcade: boot a game whose folder was picked through Android's picker
+419ed2f	android-only	Play AAB: leak checks that can fail
+4770723	android-only	Arcade: import a game's disc and dongle on their own
+f85e74e	android-only	Arcade: uninstall a game from the NAMCO screen
+eaf801a	android-only	Android: save states for arcade games
+0465644	android-only	i18n: Kurdish "Close" was translated as "near"
+3c2f9df	android-only	i18n: arcade strings indented like the rest of their files
+ea36d48	android-only	Library: an Arcade games only toggle in the ⋮ menu
+587079b	other	GameDB: Tekken 5's arcade clamp setting, under clampModes
+95006a5	android-only	Arcade import: Cancel, and replace a file with no moment it is gone
+e721b3c	android-only	Library: arcade covers from arcade.ps2ktxpak.net
+af0e48e	android-only	Textures: a window per pack with its source, creator, tip and socials
+16dcc88	android-only	Textures: read only our catalog, not sashkinbro's
+f7edffd	android-only	Textures: the pack window as tiles, in its creator's colours
+d957b7c	android-only	Textures: the online packs as pages of cubes, with creators and music
+3056d70	android-only	Textures: "November Snow" for the texture screen's music
+644ae11	android-only	Textures: back out of a creator to the page they are on
+eacdd76	android-only	Textures: Popular Today and Shuffle in the pack browser
+1f498ff	android-only	Textures: the pack browser opens on Popular Today
+c0b6166	android-only	Controller: the texture and patch managers in columns, and back to the top
+82a4cb1	android-only	Controller: switches flip with A only
+3d14cde	android-only	Android: save the base settings layer under the settings lock
+c622b37	android-only	Textures: read the pack links from the server, not the app
+e8e092b	android-only	i18n: translate the strings 2.7.2 shipped in English only
+4817b4b	android-only	Release APKs: compress the emulator cores
+a254af2	android-only	Android: leave out the emoji fonts nothing loads
+d383b36	android-only	Discord: renew the sign-in instead of retrying a dead one forever
+1b43aa4	infra	github: fixup templates to point to the right places for ARMSX2
+b77d938	android-only	Arcade: find games where they are, instead of importing them
+094a146	android-only	Android: write the data folder off the main thread, and only when needed
+907c785	android-only	Android: let libchdr open arcade hard drive CHDs
+589ba61	android-only	Arcade: say which games only reach their attract demo
+7959b7d	android-only	Arcade: racing games' test menus can be entered
+34e0554	infra	GS: name GSAlphaBitLogicOp.h in the MSVC project
+95f9f22	other-renderer	GS/Vulkan: drop the shared DATE stencil copy on a clear inside the pass
+1039f27	other-renderer	GS/Vulkan: keep the shared DATE copy's pass untiled with one loop declaration
+bb7e248	android-only	Arcade controls: a layout for all arcade games
+ccc4dba	android-only	Patches: Gran Turismo 4 (PAL): add trigger sensitivity, 480p/no-interlacing and camera patches
+8f6da16	infra	pcsx2: add the DEV9 arcade-board files to the MSVC project
+2281106	android-only	Android: index shader presets once instead of on every picker open
+b7aded0	android-only	Android: show that the shader preset picker is scanning
+13d6e46	infra	GS/TC: test what Target::Update uploads for each dirty rectangle
+3ca49cd	infra	Tests: unit tests for the RAISR upscaler engine
+977d5eb	infra	Tests: unit tests for the texture upscaler's queue and mip chain
+fb3b439	desktop-only	Qt: add a Texture Upscaling combo to the Texture Replacement tab
+7783e6b	android-only	Android: add the texture upscaling picker to the Renderer tab
+e31c110	desktop-only	Qt: add RAISR 4x (Smooth) to the Texture Upscaling combo
+ea3a84d	android-only	Android: add RAISR 4x Smooth to the texture upscaling picker
+3f1b540	infra	MSVC: list GSTexelAddressedDraw.h in pcsx2.vcxproj
+272aaa1	desktop-only	Qt: Texture Upscaling is Off, RAISR 2x or RAISR 4x
+f81bc15	android-only	Android: Texture Upscaling is Off, RAISR 2x or RAISR 4x
+554116f	android-only	Touch: hidden extra widgets no longer leave dead spots (#796)
+672a0d5	android-only	Android: the screen resolution override keeps a portrait screen's shape (#790)
+e884b3d	android-only	Android: save state hotkeys always answer, and a held button is let go (#784)
+d0bace8	android-only	Controls: several controllers can play one player
+d62b076	android-only	Save states: keep up to five autosaves
+2c61ad3	android-only	Controls: two controllers plug in Player 2's port again, wherever they play
+97601c5	android-only	Arcade: Soul Calibur II's Conquest card goes in without a note
+af176ee	android-only	i18n: bmd's Texture Upscaling picker and preset scanning in 19 languages
+47a9ccb	android-only	Quick menu: Texture Upscaling under the internal resolution
+06ca003	android-only	Android: regenerate the PGO profile for 2.8.2
+c3c55b9	android-only	Android: publish a screenshot to the gallery only once the core has written all of it
+b2c4af0	android-only	Android: regenerate the PGO profile after bmd's texture hash changes
+26d505a	android-only	tools: build the Play AAB with NDK 29, like the sideload targets
+3345c6c	android-only	Android: changing the Graphics API or deleting a driver no longer pins a game to the system driver
+5dbb6e0	android-only	Android: the Renderer tab's Reset also clears the Graphics API, GPU driver and ANGLE
+017f365	android-only	Android: enable ANGLE from per-game settings
+e2e9501	android-only	Android: offer malisx2 on Mali Valhall v9 as well as v11
+524b8d8	infra	Tests: pin every Mali Valhall v9 and v11 name the app can meet
+40b5ce3	android-only	Android: let a passed -march through instead of overriding it with armv8-a
+66ec234	infra	Android: default to NDK 29, the compiler the release targets and PGO profile use
+d7e3f1a	android-only	Android: install NDK 29 in build-all too, and fix comments that still say armv8.1-a
+7c39237	android-only	Android: one rule for whether a game database entry is in force
+0abae2a	android-only	Android: tint settings rows the game database sets or the player changed
+ff7b324	android-only	Arcade: a press goes to the cabinet's JVS board only
+4928931	android-only	Arcade: ship Soul Calibur II's Conquest card already cleared
+9be0205	android-only	Arcade: a dongle swapped beside a loose image replaces the old copy
+6eed18b	android-only	Android: ask before a hotkey closes the game (#814)
+425eb2f	android-only	Android: show what the game runs, red for non-defaults, readable marks
+84a283b	android-only	Android: rumble every controller assigned to a player
+e717185	android-only	Android: don't strand RunOnCPUThread callers when the VM thread exits
+dfdf411	android-only	Android: a game whose GPU driver was deleted uses the global driver
+e327f0d	other	GameDB: Gran Turismo 4 reads its readback asynchronously on mobile
+6a0e72a	infra	Tests: add the catalog_tests target with SHA-256 vectors and a fixtures directory
+678c71c	desktop-only	SDL: --headless WxH renders to an offscreen image, and -bigpicture is accepted
+88167ba	desktop-only	Hosts: apply the selected GPU driver pack right after the settings load
+e74749f	bigpicture-ui	Big Picture screenshots: a rescan page and the settings of the first game, so pages that need a game list can be reached
+c777f92	bigpicture-ui	Big Picture: texture upscale row (Off, RAISR 2x, RAISR 4x) in the Texture Replacement section of the Graphics page
+13c8dbc	bigpicture-ui	Big Picture: Local Link as an Ethernet device type, with host, address, port, peer ID and room code rows and the DHCP rows hidden
+98f905c	bigpicture-ui	Big Picture: automatic cover download after the game list settles, with toggle, style and region rows, a per-game region pin and progress notifications
+584af64	desktop-only	Qt UI: -uishot renders a settings page, a dialog or the main window to a PNG on the offscreen platform
+3f746b4	desktop-only	Qt: Local Link as an Ethernet device type on the Network & HDD page
+65085a6	bigpicture-ui	Big Picture: arcade setup page, per-game arcade controls, pause menu submenu, and games started through Prepare
+9fa308f	bigpicture-ui	Big Picture: GPU Drivers settings page with the driver in use, a choice of system driver or installed pack, downloads with progress and cancel, delete, and Restart Now
+7627dbe	desktop-only	Qt UI: Tools > Arcade Setup shows the boot files, the arcade BIOS and which arcade games are ready
+e573618	desktop-only	Qt UI: an arcade game is made ready before it starts, and an .acgame opens from Start File and drag and drop
+e0662a1	bigpicture-ui	Big Picture: Browse Online row on the Patches and Cheats pages that searches the community repositories and installs the picked entries
+8896c7a	bigpicture-ui	Big Picture screenshots: gamesettings:<page> opens a page of the first game's settings, and :browse starts the online patch search
+309ebab	desktop-only	Qt UI: an Arcade Controls page remaps a controller's buttons on an arcade game's cabinet, for one game or for all of them
+956177e	desktop-only	Qt UI: System > Arcade has Insert Coin for each player, Service and Test for a running arcade game
+ee3360d	desktop-only	Qt UI: Browse Online on the Patches and Cheats pages searches the community repositories and installs what the player ticks
+2d8f826	desktop-only	Qt UI: memory card backups dialog, an Automatic backups setting, and the boot-time restore question
+b716962	desktop-only	Qt UI: autosaves in the Load State menu, with interval, count and on-shutdown settings in Advanced
+a4da000	bigpicture-ui	Big Picture screenshots: gamesettings:<page> opens the first game's settings on that page, so a per-game page can be shot
+f0cb1df	bigpicture-ui	Big Picture: Texture Packs page with the online catalog, pack details, installs with progress and cancel, and installed packs, plus a Browse Texture Packs row in the Texture Replacement section
+fca33e1	desktop-only	Qt: automatic cover download with its settings and per-game region
+2dd80a2	desktop-only	Qt: Texture Packs page over the online catalog, with a button in Texture Replacement
+d4d90fd	desktop-only	Qt: GPU Drivers page for downloading and choosing a Vulkan driver pack (Linux)
+98462e1	bigpicture-ui	Big Picture: cover style and region choices read their captures before closing the dialog
+c794151	bigpicture-ui	Big Picture: loading a state of an arcade game with no game running prepares the game first
+bf1d08a	desktop-only	Qt: the game list type filter keeps each type's enum value so Arcade no longer selects Invalid
+2286cb1	bigpicture-ui	Big Picture: texture packs, drivers and arcade setup ask the network only after the page has stayed open for a second
+8e31759	desktop-only	GPU Drivers page: listed only where driver packs exist or a pack is installed or selected
+fd49c23	infra	Windows projects: list the online-packs sources in pcsx2 and common
+571b5a0	bigpicture-ui	Big Picture: resuming a game closes the memory card backups window
+a1c348a	desktop-only	Qt: Apply & Restart on the GPU Drivers page asks about and cancels a driver install in progress
+d50b481	desktop-only	Qt: reloading a game's settings after an online patch install can no longer leave the settings window empty
+7a16d8a	bigpicture-ui	Big Picture: list the Arcade Setup page title for translation
+f12f37d	infra	Deps: use a native arm64 DXC on Windows arm64 (fixes 0xc000007b)
+782e9b4	android-only	Android: the paused CPU thread sleeps while the app is out of sight
+3944bf4	android-only	Library: stop drawing while the app is out of sight
+830e460	android-only	Android: Discord idles while the app is out of sight
+0211e78	android-only	Android: gyro aim lets go of the sensor while the app is out of sight
+9572437	android-only	Library: icons keep animating when one of them leaves the screen
+a803126	android-only	Library: a switch to leave a game folder's subfolders out
+acbf466	infra	catalog tests: rename the tar.gz test entry so it stops clashing with TarEntry
+0076b5c	infra	arcade tests: accept the name as typed where the filesystem ignores case
+6b71e60	bigpicture-ui	FullscreenUI: Back in the texture pack search dialog no longer also closes the texture packs window
+99cece3	bigpicture-ui	FullscreenUI: the RetroAchievements login fields open the on-screen keyboard dialog
+abcffeb	bigpicture-ui	Screenshot harness: textdialog and padkeys pages play controller, keyboard and mouse input into Big Picture
+db31faa	desktop-only	Qt: a double click does not toggle full screen while the mouse works an arcade gun
+6cfb307	infra	catalog tests: check that WaitFor lasts until its deadline, not how many polls fit in it
+def941a	infra	vurunner: --vuopt-ir validates vuopt's first-pass port against microVU
+dcb75fd	infra	vurunner: --vuopt-ir builds the program graph and SSA for each capture
+3d26950	infra	tests: vuopt front end against microVU
+fd5ebc4	infra	vurunner: --vuopt-run compares vuopt block bodies with microVU byte for byte
+1a679f4	infra	tests: vuopt block bodies against microVU, byte for byte
+b84a334	infra	tests: vuopt lowering under register pressure
+04897b1	infra	VuReplay: seed the VU1 XGKICK-busy bit of VPU_STAT from the capture
+8adcee5	infra	vurunner: add --bench-steady, and run every replay driver under the VU FPCR
+f815ae3	infra	vurunner: --vuopt-run --vuopt-region runs vuopt regions, framed bodies elsewhere
+5eb5c8d	infra	tests: vuopt regions against microVU, through budget breaks
+8ea12df	infra	vurunner: --vuopt-bench reports cycles next to retired instructions (for device runs)
+7980564	infra	tests: vuopt lowering and regions under clamp modes 0, 2 and 3
+ddfe95f	infra	vurunner: region runs record JR/JALR targets from a plain microVU replay first
+fb65968	infra	tests: JR/JALR in a region with all, some and no recorded targets
+9aa1385	infra	tests: a transform loop over an invariant matrix in a region, every clamp mode
+5526a4f	infra	tests: VI constants, constant addresses, VI copies and LQ reuse in vuopt bodies
+34d030e	infra	tests: FMAC flag packs and every FSAND immediate shape in vuopt bodies
+8b72b3e	infra	vurunner: bench runs report each engine's compile cost (first iteration minus a steady one)
+52c3158	infra	vurunner: region runs report how many blocks the plain microVU replay compiled
+7106fa8	infra	tests: regions under every cycle budget from 1 up stop where microVU stops
+65b02d8	infra	vurunner: --vuopt-no-sched keeps region node bodies in program order (A/B)
+3bb0b66	infra	tests: the lowering suites with every body list-scheduled
+6bc21d0	infra	VU tests: MAX and MINI against VF0 in every form, on both VUs
+7cee23b	infra	VU tests: IBEQ and IBNE decide on the low halfword of a VI
+39c34bc	infra	VU tests: FCOR against each immediate shape, on both VUs
+4ef38e9	infra	VU tests: single-lane broadcast multiplies, every lane pair, both VUs
+7edd971	infra	VU tests: the OP ops keep unwritten lanes out of the flags
+6c33d87	infra	VU tests: a single-lane op's own clamp leaves its source VF alone
+9449874	infra	VU tests: $v0 survives macro memory ops and a VU0 micro dispatch
+2260033	infra	VU tests: a multiply by VF0.w agrees with a multiply by 1.0
+b764e73	infra	VU tests: single-lane FMACs leave the same state at clamp modes 1 and 2
+01ab030	infra	VU tests: digest probes for the default-mode VU1 shapes and VU0 memory
+ee23bd1	infra	VU tests: single-lane MOVE and MR32 into every lane
+f28f4e5	infra	tests: final STATUS of an E-bit conditional branch depends on its unexecuted target
+bed5204	android-only	Android: the texture pack "+" imports .zip and .tar.zst files
+c8333f9	infra	vurunner: --vuopt-no-split keeps one home map per region (A/B)
+0d9fafa	infra	tests: two loops on different vector registers, with their own home maps, under budgets from 1 up
+77cf686	infra	tests: loops dense in FMACs under every budget with the flag hack off: STATUS instances at each bail match microVU
+c1309ed	infra	tests: an XGKICK inside the accumulating loop; VuoptRegion.Repro replays and shrinks one fuzz program
+d2d22bc	infra	tests: VuoptRegion.KickBailRepro, a known XGKICK + budget-bail difference (VPU_STAT bit 12) that predates the accumulators
+f4cf9f3	infra	tests: the sticky fuzz keeps FSSET to a third of its programs so most regions accumulate
+a9cc9d8	infra	tests: sparse-event loops (the sticky bits arrive one at a time), a two-block loop, and four fixed loops where a block only accumulates what the next one has to fold in
+3485b7e	infra	tests: the VU harness clears VPU_STAT bit 12 when it seeds a run
+7928bb8	infra	tests: StickyAccumulation sweeps every budget for its XGKICK shape too
+5ecb613	infra	tests: vuopt live tier through the real dispatcher
+cab5361	infra	tests: flag ring instances at a loop-head bail (VuoptRegion.HandoffRings and mutation checks)
+2c1bed1	infra	tests: the JR slow path tiers up a program (VuoptLive.JumpPathTiersUp*)
+26908c6	infra	runners: --vuopt-sync (eerunner) and --vuopt-region-bg (vurunner)
+92dae1f	infra	tests: the background compile (VuoptLive.Background*, *DuringCompile*, ManyConcurrentRequests)
+6cbe11e	infra	vurunner: --vuopt-mutation breaks one relaxation on purpose, to show the observable gate notices
+dd62a09	other	GameDB (mobile): Baldur's Gate: Dark Alliance keeps textures resident
+cd6e8fc	other	GameDB (mobile): Baldur's Gate: Dark Alliance II keeps textures resident
+e58489d	other	GameDB (mobile): Baldur's Gate: Dark Alliance (PAL) keeps textures resident
+315d6fb	reverted	GS/Vulkan: compute decode of paletted texture windows from a GPU copy of local memory
+9bedf00	reverted	GS: add the gpu_texture_decode setting and a -gpu-texture-decode runner flag
+69f199f	reverted	GS/Vulkan: put the GPU texture decode's batching in a class a host test can drive
+58168fc	reverted	GS/TC: decode paletted hash-cache misses on the GPU (gpu_texture_decode)
+197ece9	infra	vuopt tests: FMACs with an empty destination field, against the interpreter and microVU
+4097f3e	infra	vuopt tests: what the program cache saves and loads with the tier on
+29aec14	infra	vuopt tests: keep the field and once-only loops as plain region coverage
+6466167	infra	eerunner: --reload-state-at N loads the savestate again after frame N
+cb280e0	infra	vurunner: --bench-steady measures execution without the compile
+318bdb0	infra	tests: a block shared by two entry PCs takes the timing of the entry that compiled it first
+c98b421	infra	VU tests: console rows for a branch after two writes to its VI
+682f91e	infra	VU tests: console rows and a cycle sweep for readers of a VI an ILW is loading
+e28eba7	reverted	Revert "GS/TC: decode paletted hash-cache misses on the GPU (gpu_texture_decode)"
+2aa908c	reverted	Revert "GS/Vulkan: put the GPU texture decode's batching in a class a host test can drive"
+b53da0f	reverted	Revert "GS: add the gpu_texture_decode setting and a -gpu-texture-decode runner flag"
+cbce96d	reverted	Revert "GS/Vulkan: compute decode of paletted texture windows from a GPU copy of local memory"
+ae27a58	infra	VU tests: console rows for what the end of a program waits for
+bffb227	infra	pcsx2-eerunner: --vuaot-no-install uses loaded vu-aot sidecars as plans only
+43e2e14	infra	core_test: FingerprintIop reads without changing anything, and each hash follows its own state
+34c7a59	infra	core_test: scripted SIF0 and SIF1 transfers pin what the two pumps do, recorded before they are split
+9264377	infra	core_test: what each side does to the SBUS registers, value by value, before they are made atomic
+49e0636	infra	Build files: pcsx2/IopThread/SharedWord.h is listed in CMake and in the Visual Studio project
+e814dfd	infra	core_test: the Lockstep event test, its handoff, the holds and the thread's FPCR
+893f3ff	infra	eerunner: --settings-churn applies a settings change mid-run, and a run reports what the IOP thread did
+a8ce30a	infra	core_test: the plain _cpuEventTest_Shared() does what the Off instance does
+e3ebbcc	infra	core_test: the IOP thread's FPCR after a CPU settings change
+9b0a610	infra	core_test: the guitar's whammy bar is saved in a state and restored from it
+6b1b75d	infra	core_test: the DualShock 2 record includes the stick dead zone
+d99e5fa	infra	eerunner: --host-action runs its hotkeys without the frame-by-frame pause hold
+2e10ebd	infra	eerunner: work a hotkey defers to the CPU thread runs under the same released pause hold
+7950f67	infra	IOP thread: the lag-bound object test no longer depends on which thread gets there first
+edaa4c2	infra	IOP thread: the hold test also covers a lifecycle hold, which falls back to sleeping while it waits
+b90c822	desktop-only	IOP thread: Qt and Big Picture settings for the IOP thread and its lag bound
+0314fd2	android-only	IOP thread: Android settings for the IOP thread and its lag bound
+1799cf0	infra	IOP thread: the sleep-handshake hammer runs until it has covered enough sleeps, not for a fixed number of rounds
+e955c8a	infra	core_test: the item-stamp test reads the IOP's clock at the moment of the apply, not its published position
+4bc7620	android-only	Remote play: miniupnpc 2.3.2 for the router port
+1224ab1	android-only	Remote play: its strings in all 19 languages
+52133e4	android-only	Remote play: the host sees who joins and who leaves
+37015b0	android-only	Remote play: the controller reaches everything on its screens
+57ae4b2	android-only	Remote play: the join and leave notices and the Wi-Fi QoS option in every language
+c4d6106	android-only	Remote play: WebRTC's license on the encoder taken from its HardwareVideoEncoder
+d1966cd	android-only	Remote play: hosting no longer needs Discord
+d1ab07d	android-only	Remote play: a bad pasted code or a peer that resets at once no longer crashes the app
+07ccd34	android-only	Remote play: no permanent port forward, and a renewal keeps its own port
+a5edd57	android-only	Remote play: the host's main thread no longer waits on the stream
+4080abb	android-only	Remote play: the host lets each friend in
+9347b38	android-only	Remote play: ask for Android 17's local network permission
+25e7084	android-only	About: the app's license, and the licenses of the open-source code it ships
+fc3fab2	android-only	Discord: remote play shows as "Playing remote play (2 of 2)" with the game
+7c16ed2	infra	CI: move the nightly cron off the :00 mark
+51c4c05	android-only	Android: a switch for the VU1 ahead-of-time compiler, in the in-game Performance menu and the Performance settings
+65568ca	desktop-only	Qt: a checkbox for the VU1 ahead-of-time compiler in the Advanced settings
+40726e0	bigpicture-ui	Big Picture: a switch for the VU1 ahead-of-time compiler in the System settings
+0d525e4	infra	Tests: three Linux-only expectations are skipped on macOS
+d871f68	android-only	Setup: an install a launcher has prepared skips the wizard (#847)
+73ec7a4	android-only	Controls: all controllers as Player 1, and profiles in the in-game menu
+c3b3dad	infra	eerunner: script EE cycle-rate transitions, and time what they cost
+0d5eab7	infra	EE cycle rate: pin the precedence rules, especially the one about equal values
+610623c	infra	eerunner: --ee-rate-trace, so a scripted run exercises the trace writer
+30a2dad	infra	EE cycle rate: make the runner say which path a transition took
+f697ca5	infra	EE cycle rate: pin what a per-game opt-in has to write
+8f0e3a5	infra	EE cycle rate: name the new files in the Windows project
+5365344	desktop-only	Qt: Automatic Performance Tuning switch on the Emulation settings page
+3b5ac8b	desktop-only	Qt: per-game 'Reset Auto-Tune' button and the list of what auto-tune changed
+1021f57	desktop-only	Qt: setup wizard page asking about Automatic Performance Tuning
+e5052cb	bigpicture-ui	Big Picture: Automatic Performance Tuning switch in the Emulation settings
+58246da	bigpicture-ui	Big Picture: per-game 'Reset Auto-Tune' and the list of what auto-tune changed
+a6fdb57	bigpicture-ui	Big Picture: setup step asking about Automatic Performance Tuning
+ecbcd67	android-only	Android: keep the values auto-tune saves, and let the app read and reset its record
+335881d	android-only	Android: Automatic Performance Tuning switch, and a per-game list and reset
+eba25a4	android-only	Android: setup page asking about Automatic Performance Tuning
+6e6ee76	desktop-only	Qt: a game's properties window re-reads its settings file when it comes to the front
+e08371e	infra	CI: an on-demand release pipeline for Android and Linux arm64
+f2c47b7	infra	CMake: build an out-of-tree frontend through EXTERNAL_FRONTEND_DIR
+038255e	other-renderer	GS/Vulkan: a restarted render pass loads what it drew
+702a7f7	android-only	Android: Reset gives back the value the player set in the app, not the global one
+66234ba	infra	AutoTune: test that a trial that is not kept never reaches the game's file or the host
+238d907	android-only	Android: a resolution auto-tune kept survives the next save from the app
+5e9ca3f	android-only	Android: setup page offering the ARMSX2 GPU driver built for this device
+2999bcc	desktop-only	Qt: setup wizard page offering the ARMSX2 GPU driver on Adreno
+9dd36fe	bigpicture-ui	Big Picture: setup step offering the ARMSX2 GPU driver on Adreno
+6799cf5	android-only	Android: the GPU driver page recommends the ARMSX2 Turnip on Adreno 6xx and 7xx
+1dc9a03	infra	DriverPacks tests: the setup-context test installs a pack only on Linux
+8229d87	infra	DriverPacks tests: the setup-context test checks the installed count on every platform
+21ecd71	android-only	Android: Volume and Mute in the in-game menu's Options page
+4afd39b	android-only	Touch: Tight L1/L2/R1/R2 touch areas option
+1911060	android-only	Android: the themed app icon shows the tower
+689f492	android-only	Android: home screen shortcuts use the game's cover
+a7ad453	android-only	Android: the library list shows each game's file name
+76396a5	android-only	Android: the setup page's driver card shows the release name at full width
+397b614	desktop-only	Qt: changing a setting auto-tune moves, in a game's properties, turns auto-tune off for that game
+ebb09d2	bigpicture-ui	Big Picture: changing a setting auto-tune moves, in a game's settings, turns auto-tune off for that game
+2dad56d	android-only	Android: changing a setting auto-tune moves, in a game's settings, turns auto-tune off for that game
+9f92c1a	infra	GameDB: IOP thread recommended for Shadow of the Colossus, God of War and God of War II
+f735c97	other	GameDB: OPHFlagHack for Shadow of the Colossus, as NetherSX2 has it
+5c15d2f	other	GameDB: nativeCounterDraws for Shadow of the Colossus
+d0da1eb	android-only	Resume the VM on the CPU thread after a JNI state operation
+7929804	android-only	Apply live speed changes on the CPU thread
+386ad5a	android-only	Keep save folders when importing a flat folder memory card zip
+db25a9f	android-only	Run achievements login, logout and server changes on the CPU thread
+f0a9607	android-only	Refuse to create a memory card over an existing one
+6938f95	android-only	Load backup save states from their own file in the Save Manager
+2cc379f	android-only	Edit the running game's mapping from the in-game Controller Mapping
+ed2ec27	android-only	Open the Achievements tab from the Open Achievements hotkey
+6af3b41	android-only	Send keyboard keys to the search field when the system keyboard is on
+686b464	android-only	Show the right empty-library message when folders are configured
+3e30e0c	android-only	Reset every Performance setting from the Performance tab
+39ce0c7	android-only	Fix library XMB wave shader failing to compile on Mali
+b96f0d0	android-only	Fix missing serial and cover for gzip games in the library
+0759333	android-only	Give each library category picker row its own controller id
+0453dc7	android-only	Android PGO: record internal-linkage functions by file name, not build path
+983a6ab	android-only	Android: regenerate the PGO profile on the Adreno 722 source
+85caf95	infra	Android: make pcsx2-eerunner buildable as an NDK executable
+9baa518	android-only	Android: add the USE_PERF_JITDUMP build option
+90126bd	android-only	Android: ARMSX2_BUILD_EERUNNER requires ENABLE_RECOMPILER_TEST_HOOKS
+5d2d6f7	android-only	Android: drop the limiter reset from the VM shutdown handler
+edd64c6	android-only	Android: don't make the UI thread wait on an achievements server change
+ae4bdea	android-only	Android: accept a wrapped folder-card zip with stray top-level files
+60ead7f	android-only	Android: getGameSerialFromFd's comment now says gzip images are read
+12e2370	other-renderer	GS/Vulkan: drop the Volumetric renderer from the restart load-op comment
+fafe2d9	other-renderer	GS/Vulkan: keep a draw's textures across a mid-draw submit and restart
+54c40e0	android-only	Android: offer and recommend ARMSX2 Turnip on the Adreno A12 (613)
+10d88ac	other-renderer	GS/Vulkan: turn the ImGui overlay the same way as the game image
+00db571	other-renderer	GS/Vulkan: prefer an 8-bit sRGB swap chain format
+c8e4a7e	android-only	Textures: read one file, the catalog, for the packs and who made them
+eb3a617	android-only	Android: the in-game menu reopens where it was left
+79aba9c	android-only	UI: selection highlights only show while a controller is driving
+a76c653	android-only	Android: translate the IOP thread, VU1 compiler, auto-tune and GPU driver setup strings
+36ab730	infra	CI: release builds carry the RetroAchievements client identity
+0232245	infra	CI: Linux-only release runs, and stable Linux builds never save their compiler cache
+417e83d	infra	CI: the release tag step tells a missing tag by gh's exit status
+0fd2669	android-only	Controls: a serial-less game's own controller mapping applies in game
+c7517b9	infra	CI: stable Linux builds don't use the compiler cache
+4cdf5ab	android-only	Discord: the status line shows the game's title instead of ARMSX2
+02d5cef	other-renderer	GS/Vulkan: say in the swap chain log line when pre-rotation is off by setting
+8432c94	android-only	Android: offer the swap chain pre-rotation switch in Fixes
+c94f56c	other-renderer	GS/Vulkan: name the Android window system in the swap chain log line
+44a016a	bigpicture-ui	GS/Vulkan: describe the pre-rotation switch as troubleshooting, not the sideways fix
+af25304	infra	tests: compare a VU pack's age as an integer, which gtest can print on macOS
+2dab7ec	infra	eerunner: --threadperf-frontend counts the CPU thread's front-end events in a liverun
+ea24dae	infra	tests: pin the event test MTC0 Status, EI and ERET schedule, and where each engine takes the interrupt
+7a96cee	android-only	iOS: keep SDL's hidden text field from taking the keyboard
+43e0e3d	infra	tests: pin what both EE engines charge for each divide
+98ecbc9	infra	tests: give the EE harness's JIT leg room for slow programs
+a0d3a69	android-only	Android: regenerate the PGO profile on the EE timing source
+c89fd66	android-only	Discord: a Friends switch to show ARMSX2 instead of the game in the status
+ce3743f	android-only	Android: translate the swap chain pre-rotation switch
+a445a9a	other	GameDB: Tekken 5's arcade entries use bilinearUpscale
+0680f0f	android-only	What's new: show the pictures in release notes
+5eaf585	android-only	What's new: let the pad read through an opened release
+c4ae919	android-only	What's new: reach the top with the pad, and outline the card itself
+7595577	android-only	Offer malisx2 on the Bifrost v7 parts it drives (Mali-G52, Mali-G76)
+2020dc5	android-only	Android: cite the malisx2 release, not the driver PR, in the offer comment
+fa6861b	android-only	Android tests: skip the stuck-file case where a folder cannot be made read-only (#906)
+cb78946	android-only	Library screensaver starts after 5 minutes by default
+77af8a2	android-only	Android: on-screen controls follow a connected gamepad
+19ba012	android-only	Android: Load / Manage Saves lists every game's saves as one grid
+2f7abb1	infra	iOS CI: key the prebuilt core cache on the macOS runner image
+e75813e	infra	eerunner: --frame-limiter runs a --liverun at the nominal frame rate
+e6ea50b	infra	AudioStream: tests for the ring and the stretcher, and a producer-cost benchmark
+2b904ac	infra	tests: SPU2 mixer differential test against a frozen copy of the mixer
+415c5bd	infra	tests: SPU2 mixer instructions-per-mix benchmark
+c607dfe	infra	tests: count branch misses in the SPU2 per-mix benchmark
+a6ce96b	infra	tests: freeze the reverb FIR resamplers too, and compare them directly
+943d316	infra	tests: write the SPU2 test generator's nested conditionals as if chains
+89c83a8	infra	tests: SPU2 cold-cache cycle benchmark and a cachegrind driver
+3937936	infra	tests: write the game-shaped SPU2 states to disk for tools/devlib_bench
+6ef594c	infra	tests: IOP ExecuteBlock gives back every callee-saved register
+bbb92ee	android-only	Android: move the stored lag of 24576 to one frame once
+6fdd8ea	android-only	IOP thread: say in the settings text when it is on, and that the game database turns it on
+44969f1	infra	GameDB: IOP thread for the two Korean Shadow of the Colossus releases
+de63353	android-only	Android: the IOP thread starts on where the performance tier is two or three cores
+05f55b8	infra	tests: pass the cold-stub test's asm one pointer instead of eight operands
+86eaeef	android-only	Android: problem report core, with unit tests
+5b62cef	android-only	Android: collect, arm the crash marker, and upload problem reports
+4b3fd17	android-only	Android: "Report a problem" flow, My reports, and their entry points
+0b52024	android-only	Android: problem reports no longer carry the RetroAchievements user, network addresses or file:// paths
+ec4b6fc	android-only	Android: ask about a crash only when one happened in front of the user
+0c06b09	android-only	Android: report uploads retry for real, wait for Wi-Fi, can be stopped and no longer trust the clock
+72803ba	android-only	Android: problem report screens go back a step, ask before deleting, and keep their work off the main thread
+0820ace	android-only	Android: crash startup work runs once per process
+5b37e05	android-only	Android: a crash report that fails to build keeps its Not sent line
+1c5a51b	android-only	Android: problem reports name the build's commit without the driver report
+da33490	android-only	Android: problem reports fill in the game's CRC
+09ce347	android-only	Android: a crash report says which driver the crashed run actually opened
+212a2b8	android-only	Android: problem report takes the save state first and stops the game when the dump's frames are recorded
+aeb6640	android-only	Android: problem reports scrub the app's own /data paths
+2f936b4	android-only	Android: graphics problem reports take a savestate by default
+08a0c9d	other-renderer	GS/Vulkan: give malisx2 the index range of each indexed draw
+8643784	android-only	Android: ask again whether a gamepad is attached when the activity is created
+063b263	android-only	Android: Auto hides the on-screen controls for a connected pad only on a handheld
+d382b37	other-renderer	GS/Vulkan: the Adreno 613's destination-alpha loop leaves only the targets it reads uncompressed
+afd9384	android-only	Android: regenerate the PGO profile on the GS span source
+3c5b463	android-only	Android: recommend StevenMXZ's Turnip gen8 builds on Adreno 8xx
+dab8640	android-only	Play: the microphone is optional, so devices without one keep the app
+3e553ec	android-only	Problem reports: the crash note names the App tab, where My reports is
+ba68927	android-only	Translations: the 2.9.2 strings in all 19 languages
+29f2bc3	other-renderer	GS/OpenGL: refuse an OpenGL ES 2.0 context
+58756dc	other-renderer	GS/OpenGL: clear GLAD function pointers the new context does not provide
+86c7baa	android-only	Android: the boot-failure card says what the core reported while booting
+014aa04	android-only	Android: a game that cannot start for want of a BIOS says what to do here
+a340c3d	android-only	Android: importing a PS1 BIOS says it is one
+56391dd	infra	tests: StubHost keeps the errors the code under test reports
+97e64ee	infra	tests: JR and JALR jump to rs as it was before the delay slot
+876286b	android-only	Auto Progressive Scan: hold Triangle+Cross through Criterion intros
+d030a49	android-only	Translations: the batch's strings in all 19 languages
+6462bb3	android-only	Driver list: a release with one zip per device lists each zip by its own name
+c4792bf	android-only	Driver list: show only the sources built for the device's GPU family
+9144e4f	desktop-only	Texture packs: a This Game list in both browsers, shown while a game runs
+b625bba	android-only	Android: move the touch stick's thumb in a layer, not through composition
+2380b48	android-only	Android: build rcheevos from the root 3rdparty copy (#941)
+4c48202	desktop-only	SDL frontend: scan the game folders at startup, and make the scan cancellable
+842fde3	android-only	Android: NativeApp.isEmulogOpen says whether the core has the emulog open
+80cadf8	android-only	Android: keep one backup of the emulator log, rotated before the core truncates it
+70bd63f	android-only	Android: every problem report also sends the emulator log backup
+6ef8dde	other-renderer	GS/Vulkan: Recreate surfaces that report no formats and fix a double destroy
+10aaffd	other-renderer	GS/Vulkan: Only match depth/stencil load ops on Arm's driver
+6f623bb	desktop-only	Linux/arm64: Report missing CPU features instead of dying with SIGILL
+7a9bdbb	other-renderer	GS/Vulkan: Use three swapchain images with IMMEDIATE present
+3d2124c	other	GameDB: Recommend the IOP thread for Gran Turismo 4
+fc4ab0b	android-only	Android: regenerate the PGO profile on the source with the 25 picked commits
+464e6f1	desktop-only	gsrunner ladder: finish the back thread's draws before reading local memory
+eef110e	android-only	Android: regenerate the PGO profile on the source with the NEON IDCT, GIF buffers, microVU jump tables and SW S/T/Q changes
+1d68034	infra	tests: count resident pages in the kernel's page size, not __pagesize
+c1b6294	desktop-only	gsrunner: -burst-memo, -burst-memo-control and the burst memo's statistics
+c3eb010	desktop-only	PageFaultHandler: take is_write from the ESR, not the instruction at the pc
+c1a479e	other-renderer	GS/Vulkan: the device owns a GSCompileQueue
+3dc2d0c	other-renderer	GS/Vulkan: request VK_EXT_descriptor_indexing where the driver has its features
+f4748a8	desktop-only	gsrunner: the run machine's development switches
+c105935	other-renderer	GS/Vulkan: a draw that continues a run skips the classic path's device work
+d9adc2e	other-renderer	GS/Vulkan: the run machine's log counts its refusals by detail
+faf5551	other-renderer	GS/Vulkan: a draw that opens a run after a ring or texture-array end needs its program built too
+6519f93	infra	tests: a pack is written after its empty directory was removed
+af018c7	other-renderer	GS/Vulkan: the recorded-key precompile runs on GSCompileQueue
+5e3a7af	other-renderer	GS/Vulkan: warm the GLSL compiler on the compile queue when the device opens
+bdea9c8	other-renderer	GS/Vulkan: every game's SPIR-V goes into the device's pack as well
+5cf43f7	other-renderer	GS/Vulkan: the driver's pipeline blob is stamped by the driver, not the app's build
+1ff0aa7	other-renderer	GS/Vulkan: on Android, name the linked GLSL compiler by its own versions
+b23d754	android-only	Android: save the shader caches on every trip to the background, not once per 120 s
+a5e4668	android-only	Android: a new install removes only the GPU caches older builds wrote
+de29c2c	other-renderer	GS/Vulkan: a game's recorded pipeline keys survive every build that keeps the key layout
+90edde9	other-renderer	GS/Vulkan: the run's header and table set takes a descriptor pool of its own
+ff12a8d	other-renderer	tests: every recorded pipeline key a draw can make is loadable
+3bc4472	other-renderer	GS/Vulkan: recorded keys with raster ordering or a stencil counter are loadable
+a1c3e9c	other-renderer	GS/Vulkan: the run log records which fixed state ended a run (development)
+5d93d09	other-renderer	GS/Vulkan: a run flushed from inside an apply keeps the classic path's chosen pipeline
+cdecdd5	other-renderer	GS/Vulkan: the run log carries each run's bounding-box area by dear class (development)
+c040d3a	other-renderer	GS/Vulkan: after the gate refuses an in-pass kick, offer it again 32 draws later
+8935aca	other-renderer	GS/Vulkan: the in-pass kick spends at most a quarter of the readback wait it saves
+7fbca34	infra	tests: a hand-worked case of the kick kernel's four-wide decision
+33dc6de	reverted	GS/Vulkan: draws that alternate two sets of constants reuse the earlier upload
+a55a11a	reverted	GS/Vulkan: declining the targets whose runs do not pay (off, unfinished)
+13a897a	reverted	Revert "GS/Vulkan: declining the targets whose runs do not pay (off, unfinished)"
+1f3b08f	infra	tests: pin the texture hashes that name dumped and replacement textures
+669eec4	infra	tests: pin the alpha range of an expanded palette
+cf77d35	infra	tests: block identities over held depth words are those of the words
+ea33ebb	reverted	Revert "GS/Vulkan: draws that alternate two sets of constants reuse the earlier upload"
+f12c47d	other-renderer	GS/Vulkan: a draw that continues a run still counts toward the readback in-pass kick
+01e1b21	other-renderer	GS/Vulkan: the run machine's rings are made by the first draw that would join a run
+26c4c72	other-renderer	GS/Vulkan: the stencil counter resolve pipeline keeps blend constants and line width dynamic
+2569d28	other-renderer	GS/Vulkan: a run opens at the second of two consecutive draws that share its fixed state
+0a07404	other-renderer	GS/Vulkan: the stencil counter resolve pipeline takes blend constants and line width dynamic
+2b418a6	other-renderer	GS/Vulkan: the run pipeline declares its dynamic state through AddCachedDynamicState
+504621a	other-renderer	GS/Vulkan: the stencil counter resolve pipeline takes blend constants and line width dynamic
+e83d108	other-renderer	GS/Vulkan: a draw that cannot open a run is primed before it is classified
+f3878de	reverted	GS/Vulkan: a run that holds a large draw keeps one state for all its draws
+720bf90	reverted	Revert "GS/Vulkan: a run that holds a large draw keeps one state for all its draws"
+0f24a1e	infra	tests: the block hasher's unaligned update stays inside the test memory
+22b1a76	android-only	Android: regenerate the PGO profile on the source with the GS runs build
+b74562c	other-renderer	GS/Vulkan: the run machine stops when an empty descriptor pool refuses a set
+5cbbd3a	other-renderer	GS/Vulkan: VkResultToString names VK_ERROR_FRAGMENTED_POOL and VK_ERROR_OUT_OF_POOL_MEMORY
+c87755e	android-only	Offer malisx2 on the Mali-G610 and G710 (Valhall v10)
+328f224	android-only	Android: Vulkan is the default renderer instead of Auto
+aa1047d	desktop-only	GPU Drivers pages: name both pack families, pass the session to the setup offer
+4c30000	android-only	Offer malisx2 on every Mali of arch 7, 9, 10 and 11
+a19fc8d	other-renderer	GS/Vulkan: a run's texture set is a fixed array of 32, without a variable descriptor count
+e4b0dea	android-only	Android: a switch for Extended RAM (128MB)
+dfc4346	android-only	Android: link the core with emulated TLS when the minimum API is below 29
+8db8200	infra	Tests: a second boot after a VM that stopped with VU1 busy
+9cb643d	other-renderer	LSFG: rebuild the swap chain before the acquire, and make it FIFO
+6d9511e	infra	macOS: a refused notarization is not a build failure
+b8e9084	infra	Tests: run and rewrite an EE JIT block above 64MB with Extended RAM
+0c4cf3e	android-only	Android: say that save states do not load across the Extended RAM switch
+22eb26c	infra	MSVC: list the three headers the Visual Studio project was missing
+3b2e0a9	android-only	Translations: 2.9.4's new strings in all 19 languages
+88ef87a	android-only	Android: no Qualcomm driver notice at game start
+c111e3a	android-only	Report: the consent text says reports are kept 14 days, not 90
+37cdc58	infra	GS: list GSAlphaKnownRects.h in the MSVC project
+9769da2	other	GameDB: raise Beyond Good & Evil to High blending on mobile
+b802327	infra	Tests: lift write protection before SetExtraMemory shrinks the map
+6d79eb4	other-renderer	GS/Vulkan: signal the spin semaphore only when the spin has its own queue
+72f5659	other-renderer	GS/Vulkan: decide full-screen exclusive from the window system on Windows
+3334fa0	android-only	Android: call the Java file helpers through cached method IDs
+b043d77	infra	tests: a pause flush during a folder card block rewrite keeps the files
+3921b0b	android-only	Android: regenerate the PGO profile on the source with the sprite ramp, alpha rectangle, IOP thread lag and folder memory card changes
+392103d	android-only	Android: a changed PGO profile rebuilds every object
+4f3f8cf	other-renderer	GS/Vulkan: flush the run machine's index and table rings before the submit
+a5a4043	infra	eerunner: --pad-script, --pad-record, --frame-hashes and the nullhw renderer
+410a667	infra	gsctl: pad commands and a TCP connection
+bab7bf2	android-only	Android: launch extras that turn PINE on and pick the GPU driver
+011bc1e	infra	eerunner: --frame-hashes reads VU1 memory once the VU1 thread is idle
+ff04837	infra	tests: a Vulkan pipeline with eight vertex attributes takes a second buffer and a ninth attribute
+9cbf606	other-renderer	GS/Vulkan: the pipeline builder checks each vertex array against its own limit
+bb604d7	desktop-only	SDL frontend: pausing a game launched from the command line no longer quits
+d36fd73	infra	GS/HW: test that a state entry hands the device what the derivation would
+43f58ad	infra	GS/HW: test rows through the renderer, and that a self-read is not one
+4e61b0a	android-only	Android: regenerate the PGO profile on the source with the GS draw-state table
+bd5cb3d	infra	GS: tests of the row queue: what waits, what emits it, and the twin sort's windows
+d96fee1	other-renderer	GS/Vulkan: rows wait in the queue whether or not the run machine exists
+0836d21	infra	GS: row queue tests for copies, depth clears, invalidations and recycles
+a681ee5	infra	GS: test that a texture parked for a recorded group comes back to the pool, failing
+e686772	other-renderer	GS/Vulkan: a group that replaces one ended at a ring or the texture cap needs its own program
+2382ad8	other-renderer	GS/Vulkan: the emitter classifies a row only when a group is open or would open
+dcb8a56	other-renderer	GS/Vulkan: a row that changes nothing about its group skips the group's checks
+1aadb63	infra	GS: tests of a class's opening length predicted from its own streaks, failing
+ae7ac89	other-renderer	GS/Vulkan: the row emitter's decisions do not depend on the in-pass kick
+6d8d4e3	other-renderer	GS/Vulkan: an in-pass readback kick begins the open pass again on the same targets
+5800ab1	other-renderer	GS/Vulkan: hand runs of TFX draws to the driver's run entry where it has one
+3258d3c	other-renderer	GS/Vulkan: a run of one or two groups takes the ordinary calls
+2253c1c	other-renderer	GS/Vulkan: a draw that declares its own feedback loop is not a run group
+670bae4	infra	tests: after a device loss a GPU palette read uses only the new device's textures
+4b087b9	other-renderer	GS/Vulkan: a grown vertex ring records the waiting run groups before it is bound
+f77a156	other-renderer	GS/Vulkan: a texture leaving the device records the waiting run groups first
+a52f812	other-renderer	GS/Vulkan: remove the run emitter's process-wide counters
+89fe959	other-renderer	GS/Vulkan: the run emitter's copyright line matches the other files
+41ec92c	infra	msvc: list the pad script and the new GS headers
+0af1236	infra	tests: the short-run texture model hands an open group to the ordinary calls at a flush
+8f9ebf2	infra	tests: the IOP thread under a seccomp filter that traps membarrier
+c29c900	infra	tests: EE fastmem fault reported at the end of the 4 GB window
+6963fd3	android-only	Android: regenerate the PGO profile on the release source, with one game on the software renderer
+9068051	android-only	Android: offer the newest ARMSX2 GPU driver once after each app update
+b73edaa	desktop-only	libretro: read input from every controller port
+375903f	desktop-only	libretro: send rumble to the pad's libretro port
+a62abe9	desktop-only	libretro: add a Multitap option
+ef66d24	desktop-only	libretro: apply the Multitap option at startup only
+0c6997f	android-only	Android: ignore cluster_cpus_list in the app's cpuinfo copy when the cluster id is unknown
+66385c5	bigpicture-ui	FullscreenUI: add a clock format setting for the menu clocks
+f76f84f	bigpicture-ui	FullscreenUI: regenerate the translation string block
+b391e3d	bigpicture-ui	FullscreenUI: show AM or PM on the 12-hour clock in locales without AM/PM text
+873baee	infra	Build: one Linux arm64 binary for ARMv8.0 and up, picking LSE at runtime
+f3548ac	infra	tests: the NOP-padded {ST, RGBAQ, XYZ2} triple under a moving environment and at a draw start
+95fad86	infra	tests: the {RGBAQ, XYZF2} pair through Transfer, draw buffering, the mid-record resume and a draw start
+00c63a3	android-only	Android: drop a trigger's duplicate key event whenever its axis moves (#674)
+4dc3131	android-only	Android: queue settings applies on the CPU thread instead of waiting for them
+676b08a	android-only	Android: remove the live GS apply queue, which nothing calls
+cd0d946	infra	eerunner: --nodisc boots with the tray empty and loads the savestate
+31e297b	infra	eerunner: --dump-config loads --savestate first
+c9b6e89	infra	CI: build the iOS IPA on the Xcode 27 runner
+538296d	infra	tests: drop host_page_test, its tests already run in common_test and recompiler_tests
+76342f4	infra	CI: stop passing a host page size to the Linux arm64 builds
+03ed8b4	infra	CI: one Linux arm64 AppImage instead of a 4K and a 16K one
+06283d6	android-only	Android: native DualShock 3 button pressure over USB
+9b5f79a	android-only	Android: keep a DualShock 3 button pressed while its pressure reads 0
+8750ad9	android-only	Android: rumble for a DualShock 3 under the USB takeover
+926bdd2	android-only	Android: drop unchanged USB pad reports on the reader thread
+6370337	android-only	Android: describe what applyPadButton does with p_range
+715d040	android-only	Android: build and ship one core library, libemucore.so
+6db7182	infra	libretro CI: drop the Android page size argument
+f57be49	ios-internal	iOS: test that shared names are declared once
+7a2701a	infra	macOS: port PCSX2's Xcode 27 dependency build fix
+dd3c095	infra	macOS: download patches.zip from PCSX2's pcsx2_patches
+4f4dede	infra	Tests: pin that the flag pass reads only words the program compiled
+2a51856	infra	EE: name the issue model in the MSVC project
+ab023a8	infra	CMake: fix the stub note left stale by the iOS runtime move
+c1aaf52	infra	Tests: VU1 micro-memory addresses at the wrap
+2e2bf73	infra	Tests: compare BAL and JALR link values and TPC whole in the chunk store and reload tests
+70e7b23	infra	Tests: run the T-bit end tests on VU1 as well as VU0
+9dd2c6e	infra	VU1 chunk store: tests for IbitHack reads across the top and below the root
+399c17e	android-only	Android: regenerate the PGO profile on the source with the VU1 chunk store and the EE two-issue timing model
+1e0baab	android-only	Translations: the MaliSX2 driver notice in all 19 languages
+61a4b2b	infra	iOS: skip the indentation commit in git blame
+48f7ba8	android-only	Android: offer our Turnip pack on the Adreno 8xx parts its device table lists
